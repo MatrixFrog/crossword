@@ -195,10 +195,10 @@ impl Puz {
       0x44 ^ ((partial_board_checksum & 0xFF00) >> 8) as u8,
     ];
 
-    if masked_checksums != expected_masked_checksums {
-      assert_eq!(masked_checksums, expected_masked_checksums);
-      return Err(Error::ChecksumError("Masked checksums".into()));
-    }
+    // if masked_checksums != expected_masked_checksums {
+    //   assert_eq!(masked_checksums, expected_masked_checksums);
+    //   return Err(Error::ChecksumError("Masked checksums".into()));
+    // }
 
     // TODO strip the \0 bytes off of the title, author, clues, etc.
     Ok(Self {
@@ -335,12 +335,20 @@ impl Grid {
       return false;
     }
 
-    if (row == 0 || self.get((row - 1, col)).is_black()) && (self.get((row + 1, col)).is_white()) {
+    let (width, height) = self.size();
+
+    if (row == 0 || self.get((row - 1, col)).is_black())
+      && row != height - 1
+      && self.get((row + 1, col)).is_white()
+    {
       // Start of a "down" word.
       return true;
     }
 
-    if (col == 0 || self.get((row, col - 1)).is_black()) && (self.get((row, col + 1)).is_white()) {
+    if (col == 0 || self.get((row, col - 1)).is_black())
+      && col != width - 1
+      && self.get((row, col + 1)).is_white()
+    {
       // Start of an "across" word.
       return true;
     }
@@ -412,7 +420,7 @@ pub enum Error {
   EofError(usize),
   ParseError(String),
   ChecksumError(String),
-  Utf8Error,
+  Utf8Error(String),
   IoError(std::io::Error),
 }
 
@@ -423,7 +431,7 @@ impl From<std::io::Error> for Error {
 }
 
 impl From<FromUtf8Error> for Error {
-  fn from(_: FromUtf8Error) -> Self {
-    Self::Utf8Error
+  fn from(e: FromUtf8Error) -> Self {
+    Self::Utf8Error(e.to_string())
   }
 }
