@@ -4,7 +4,6 @@ use std::fs;
 use puzparser::{Error, Puz};
 
 fn parse_puz(path: &str) -> Result<Puz, Error> {
-  println!("Parsing from {}...", path);
   let data: Vec<u8> = fs::read(path)?;
   Puz::parse(data)
 }
@@ -34,7 +33,14 @@ fn main() -> Result<(), Error> {
     }
     dbg!(success, failure);
   } else {
-    parse_puz(path)?;
+    match parse_puz(path) {
+      Ok(puz) => {
+        println!("Parsed {} successfully", puz.title);
+      }
+      Err(e) => {
+        println!("Failed with: {:?}", e);
+      }
+    }
   }
 
   Ok(())

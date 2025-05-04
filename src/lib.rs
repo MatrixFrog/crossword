@@ -79,11 +79,12 @@ impl Scanner {
     Ok(Vec::from(data))
   }
 
-  /// Return all the bytes from the current cursor up to and including the next NUL byte.
+  /// Parses a C-style NUL-terminated string. Note that the cursor moves just past the NUL
+  /// byte, but the string returned does not include that byte.
   fn parse_nul_terminated_string(&mut self) -> Result<String, Error> {
     for (index, byte) in self.data[self.cursor..].iter().enumerate() {
       if *byte == 0 {
-        let bytes = &self.data[self.cursor..self.cursor + index + 1];
+        let bytes = &self.data[self.cursor..self.cursor + index];
         self.cursor += index + 1;
         return Ok(String::from_utf8(bytes.to_vec())?);
       }
@@ -163,6 +164,8 @@ impl Puz {
 
     let notes = scanner.parse_nul_terminated_string()?;
 
+    // dbg!(&title, &author, &copyright, &notes);
+
     // TODO: Store these as private data on the Puz object somehow.
     let numbered_squares = solution
       .positions()
@@ -173,16 +176,13 @@ impl Puz {
 
     let solution_checksum = Self::checksum(&solution_bytes, 0);
     let grid_checksum = Self::checksum(&solve_state_bytes, 0);
-    let mut partial_board_checksum = Self::checksum(title.as_bytes(), 0);
-    partial_board_checksum = Self::checksum(author.as_bytes(), partial_board_checksum);
-    partial_board_checksum = Self::checksum(copyright.as_bytes(), partial_board_checksum);
+    let mut partial_board_checksum = Self::checksum_metadata_string(&title, 0);
+    partial_board_checksum = Self::checksum_metadata_string(&author, partial_board_checksum);
+    partial_board_checksum = Self::checksum_metadata_string(&copyright, partial_board_checksum);
     for clue in clues.iter() {
-      // For the clues, don't include the \0 in the calculation.
-      let clue_bytes = clue.as_bytes();
-      let clue_bytes = &clue_bytes[0..clue_bytes.len() - 1];
-      partial_board_checksum = Self::checksum(&clue_bytes, partial_board_checksum);
+      partial_board_checksum = Self::checksum_clue(clue, partial_board_checksum);
     }
-    partial_board_checksum = Self::checksum(notes.as_bytes(), partial_board_checksum);
+    partial_board_checksum = Self::checksum_metadata_string(&notes, partial_board_checksum);
 
     let expected_masked_checksums = [
       0x49 ^ (cib_checksum & 0xFF) as u8,
@@ -195,10 +195,9 @@ impl Puz {
       0x44 ^ ((partial_board_checksum & 0xFF00) >> 8) as u8,
     ];
 
-    // if masked_checksums != expected_masked_checksums {
-    //   assert_eq!(masked_checksums, expected_masked_checksums);
-    //   return Err(Error::ChecksumError("Masked checksums".into()));
-    // }
+    if masked_checksums != expected_masked_checksums {
+      return Err(Error::ChecksumError("Masked checksums".into()));
+    }
 
     // TODO strip the \0 bytes off of the title, author, clues, etc.
     Ok(Self {
@@ -227,6 +226,23 @@ impl Puz {
       checksum = checksum.overflowing_add(byte as u16).0;
     }
     checksum
+  }
+
+  /// Part of the checksum calculations. For metadata (title, author, copyright, or notes),
+  /// we do nothing if the string is empty, but if it's not empty we include the \0 byte in
+  /// the calculation.
+  fn checksum_metadata_string(s: &str, input_checksum: u16) -> u16 {
+    if s == "" {
+      return input_checksum;
+    }
+
+    let c = Self::checksum(s.as_bytes(), input_checksum);
+    Self::checksum(&[0], c)
+  }
+
+  /// Part of the checksum calculations. For clues we do not include the trailing \0 byte.
+  fn checksum_clue(s: &str, input_checksum: u16) -> u16 {
+    Self::checksum(s.as_bytes(), input_checksum)
   }
 }
 
