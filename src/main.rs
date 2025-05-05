@@ -1,7 +1,6 @@
+use puzparser::{Error, Puz};
 use std::env;
 use std::fs;
-
-use puzparser::{Error, Puz};
 
 fn parse_puz(path: &str) -> Result<Puz, Error> {
   let data: Vec<u8> = fs::read(path)?;

@@ -192,7 +192,7 @@ impl Puz {
         c = Self::checksum_metadata_string(&author, c);
         c = Self::checksum_metadata_string(&copyright, c);
         for clue in clues.iter() {
-          Self::checksum_clue(&clue, c);
+          c = Self::checksum_clue(&clue, c);
         }
         c = Self::checksum_metadata_string(&notes, c);
         c
@@ -279,6 +279,7 @@ impl Puz {
   /// Part of the checksum calculations. For metadata (title, author, copyright, or notes),
   /// we do nothing if the string is empty, but if it's not empty we include the \0 byte in
   /// the calculation.
+  #[must_use]
   fn checksum_metadata_string(s: &[u8], input_checksum: u16) -> u16 {
     if s == b"\0" {
       return input_checksum;
@@ -288,6 +289,7 @@ impl Puz {
   }
 
   /// Part of the checksum calculations. For clues, we do not include the trailing \0 byte.
+  #[must_use]
   fn checksum_clue(s: &[u8], input_checksum: u16) -> u16 {
     Self::checksum(&s[0..s.len() - 1], input_checksum)
   }
