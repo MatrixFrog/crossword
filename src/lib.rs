@@ -82,27 +82,19 @@ impl Scanner {
     Ok(Vec::from(data))
   }
 
-  /// Parses a C-style NUL-terminated string. Note that the cursor moves just past the NUL
-  /// byte, but the string returned does not include that byte.
-  fn parse_nul_terminated_string(&mut self) -> Result<String, Error> {
+  /// Parses a C-style NUL-terminated string, including the NUL byte. In
+  /// this function, we return just the raw bytes as they appear in the
+  /// file. Converting them to a string (using the ISO-8859-1 encoding)
+  /// is done later.
+  fn parse_nul_terminated_string(&mut self) -> Result<Vec<u8>, Error> {
     for (index, byte) in self.data[self.cursor..].iter().enumerate() {
       if *byte == 0 {
-        let bytes = &self.data[self.cursor..self.cursor + index];
+        let bytes = &self.data[self.cursor..self.cursor + index + 1];
         self.cursor += index + 1;
-        match ISO_8859_1.decode(bytes, Strict) {
-          Ok(s) => {
-            return Ok(s);
-          }
-          Err(e) => {
-            return Err(Error::Iso_8859_1Error(format!(
-              "Failed parsing '{:?}' as ISO-8859-1: {}",
-              bytes, e
-            )));
-          }
-        }
+        return Ok(bytes.to_vec());
       }
     }
-    Err(Error::EofError(self.data.len()))
+    return Err(Error::EofError(self.data.len()));
   }
 }
 
@@ -245,12 +237,25 @@ impl Puz {
       height,
       solution,
       solve_state,
-      title,
-      author,
-      copyright,
-      clues,
-      notes,
+      title: Self::decode_str(&title)?,
+      author: Self::decode_str(&author)?,
+      copyright: Self::decode_str(&copyright)?,
+      clues: clues
+        .into_iter()
+        .map(|clue| Self::decode_str(&clue))
+        .collect::<Result<Vec<_>, Error>>()?,
+      notes: Self::decode_str(&notes)?,
     })
+  }
+
+  fn decode_str(bytes: &[u8]) -> Result<String, Error> {
+    assert_eq!(0x0, *bytes.last().unwrap());
+
+    ISO_8859_1
+      .decode(&bytes[0..bytes.len() - 1], Strict)
+      .map_err(|e| {
+        Error::Iso_8859_1Error(format!("Failed parsing '{:?}' as ISO-8859-1: {}", bytes, e))
+      })
   }
 
   // https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5#checksums
@@ -270,18 +275,17 @@ impl Puz {
   /// Part of the checksum calculations. For metadata (title, author, copyright, or notes),
   /// we do nothing if the string is empty, but if it's not empty we include the \0 byte in
   /// the calculation.
-  fn checksum_metadata_string(s: &str, input_checksum: u16) -> u16 {
-    if s == "" {
+  fn checksum_metadata_string(s: &[u8], input_checksum: u16) -> u16 {
+    if s == b"\0" {
       return input_checksum;
     }
 
-    let c = Self::checksum(s.as_bytes(), input_checksum);
-    Self::checksum(&[0], c)
+    return Self::checksum(s, input_checksum);
   }
 
   /// Part of the checksum calculations. For clues, we do not include the trailing \0 byte.
-  fn checksum_clue(s: &str, input_checksum: u16) -> u16 {
-    Self::checksum(s.as_bytes(), input_checksum)
+  fn checksum_clue(s: &[u8], input_checksum: u16) -> u16 {
+    Self::checksum(&s[0..s.len() - 1], input_checksum)
   }
 }
 
@@ -475,6 +479,7 @@ pub enum Error {
   EofError(usize),
   ParseError(String),
   ChecksumError(String),
+  #[allow(non_camel_case_types)]
   Iso_8859_1Error(String),
   IoError(std::io::Error),
 }
