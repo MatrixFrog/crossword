@@ -90,6 +90,7 @@ impl Scanner {
     for (index, byte) in self.data[self.cursor..].iter().enumerate() {
       if *byte == 0 {
         let bytes = &self.data[self.cursor..self.cursor + index + 1];
+        assert_eq!(0x0, *bytes.last().unwrap());
         self.cursor += index + 1;
         return Ok(bytes.to_vec());
       }
