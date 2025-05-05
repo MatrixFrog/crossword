@@ -5,7 +5,7 @@ use puzparser::{Error, Puz};
 
 fn parse_puz(path: &str) -> Result<Puz, Error> {
   let data: Vec<u8> = fs::read(path)?;
-  Puz::parse_ignoring_checksums(data)
+  Puz::parse(data, true)
 }
 
 fn main() -> Result<(), Error> {

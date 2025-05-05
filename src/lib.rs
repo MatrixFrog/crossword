@@ -117,7 +117,7 @@ impl Puz {
   }
 
   /// Create a Puz from the bytes of a `.puz` file.
-  fn parse(data: Vec<u8>, verify_checksums: bool) -> Result<Self, Error> {
+  pub fn parse(data: Vec<u8>, verify_checksums: bool) -> Result<Self, Error> {
     let cib_checksum_expected = Self::checksum(&data[0x2C..0x34], 0);
 
     let mut scanner = Scanner::new(data);
@@ -133,11 +133,11 @@ impl Puz {
     let masked_checksums = scanner.take_n_bytes(8)?;
 
     // Version string
-    let _ = scanner.take_n_bytes(4)?.to_vec();
+    let _ = scanner.take_n_bytes(4)?;
     // Reserved 1C
     let _ = scanner.take_n_bytes(2)?;
-
-    let scrambled_checksum = scanner.take_n_bytes(2)?;
+    // Scrambled checksum
+    let _ = scanner.take_n_bytes(2)?;
 
     // Nothing listed for these but it says the scrambled checksum ends at 0x1F and the
     // width should be at 0x2C so I guess we're just supposed to skip 0x20 through 0x2B?
@@ -151,8 +151,10 @@ impl Puz {
     // Unknown bitmask
     let _ = scanner.parse_short()?;
 
-    // Scrambled tag
-    let _ = scanner.parse_short()?;
+    let scrambled_tag = scanner.parse_short()?;
+    if scrambled_tag != 0 {
+      return Err(Error::ScrambledError);
+    }
 
     let solution_bytes = scanner.take_n_bytes(width * height)?;
     let solution = Grid::parse(&solution_bytes, width, height);
@@ -174,6 +176,7 @@ impl Puz {
     // dbg!(&title, &author, &copyright, &notes);
 
     // TODO: Store these as private data on the Puz object somehow.
+    #[allow(unused)] // For now
     let numbered_squares = solution
       .positions()
       .filter(|&pos| solution.need_number_at(pos))
@@ -197,7 +200,7 @@ impl Puz {
 
       if overall_checksum != overall_checksum_expected {
         return Err(Error::ChecksumError(format!(
-          "Overall checksum: Expected {} but got {}",
+          "Overall checksum: Expected {:#x} but got {:#x}",
           overall_checksum_expected, overall_checksum,
         )));
       }
@@ -259,6 +262,7 @@ impl Puz {
   }
 
   // https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5#checksums
+  #[must_use]
   fn checksum(base: &[u8], input_checksum: u16) -> u16 {
     let mut checksum = input_checksum;
     for &byte in base {
@@ -473,7 +477,6 @@ impl Display for Grid {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub enum Error {
   // Unexpectedly reached the end of the file.
   EofError(usize),
@@ -481,6 +484,7 @@ pub enum Error {
   ChecksumError(String),
   #[allow(non_camel_case_types)]
   Iso_8859_1Error(String),
+  ScrambledError,
   IoError(std::io::Error),
 }
 
