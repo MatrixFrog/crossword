@@ -5,7 +5,7 @@ use puzparser::{Puz, Square};
 use ratatui::{
   DefaultTerminal, Frame,
   buffer::Buffer,
-  layout::{Constraint, Layout, Margin, Rect},
+  layout::{Constraint, Flex, Layout, Rect},
   style::{Color, Style, Stylize},
   text::Line,
   widgets::{Block, Padding, Paragraph, Widget},
@@ -99,7 +99,7 @@ impl App {
 
 impl Widget for &App {
   fn render(self, area: Rect, buf: &mut Buffer) {
-    let vertical_layout = Layout::vertical([Constraint::Length(2), Constraint::Length(2)]);
+    let vertical_layout = Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]);
     let [title_area, main_area] = vertical_layout.areas(area);
 
     let title = Line::from(vec![
@@ -110,20 +110,29 @@ impl Widget for &App {
     .centered();
     title.render(title_area, buf);
 
-    let puzzle_area = main_area.inner(Margin {
-      horizontal: 3,
-      vertical: 2,
-    });
+    let puzzle_area = center(
+      main_area,
+      Constraint::Length(
+        (self.puzzle.solution.width() * (1 + SQUARE_WIDTH as usize))
+          .try_into()
+          .unwrap(),
+      ),
+      Constraint::Length(
+        (self.puzzle.solution.height() * (1 + SQUARE_HEIGHT as usize))
+          .try_into()
+          .unwrap(),
+      ),
+    );
 
     let mut square_area = Rect {
       x: puzzle_area.x,
-      y: puzzle_area.y + 1,
+      y: puzzle_area.y,
       width: SQUARE_WIDTH,
       height: SQUARE_HEIGHT,
     };
-    for row in 0..self.puzzle.solution.height() {
-      for col in 0..self.puzzle.solution.width() {
-        let square = self.puzzle.solution.get((row, col));
+    for row in 0..self.puzzle.solve_state.height() {
+      for col in 0..self.puzzle.solve_state.width() {
+        let square = self.puzzle.solve_state.get((row, col));
         match square {
           Square::Black => Block::new()
             .style(Style::new().bg(Color::Black))
@@ -148,4 +157,16 @@ impl Widget for &App {
       square_area.y += SQUARE_HEIGHT + 1;
     }
   }
+}
+
+/// https://ratatui.rs/recipes/layout/center-a-widget/
+fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
+  dbg!(area);
+  let [area] = Layout::horizontal([horizontal])
+    .flex(Flex::Center)
+    .areas(area);
+  dbg!(area);
+  let [area] = Layout::vertical([vertical]).flex(Flex::Center).areas(area);
+  dbg!(area);
+  area
 }
