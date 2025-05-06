@@ -384,7 +384,15 @@ impl Grid {
 
   /// The size of this grid, expressed as (width, height).
   fn size(&self) -> (usize, usize) {
-    (self.0[0].len(), self.0.len())
+    (self.width(), self.height())
+  }
+
+  pub fn width(&self) -> usize {
+    self.0[0].len()
+  }
+
+  pub fn height(&self) -> usize {
+    self.0.len()
   }
 
   /// An iterator over all the positions of this grid, from left to right and top to bottom.
@@ -392,7 +400,7 @@ impl Grid {
     GridPosIter::new(self.size())
   }
 
-  fn get(&self, (r, c): Pos) -> Square {
+  pub fn get(&self, (r, c): Pos) -> Square {
     self.0[r][c]
   }
 
@@ -417,10 +425,8 @@ impl Grid {
       return false;
     }
 
-    let (width, _) = self.size();
-
     if (col == 0 || self.get((row, col - 1)).is_black())
-      && col != width - 1
+      && col != self.width() - 1
       && self.get((row, col + 1)).is_white()
     {
       // Start of an "across" word.
@@ -435,10 +441,8 @@ impl Grid {
       return false;
     }
 
-    let (_, height) = self.size();
-
     if (row == 0 || self.get((row - 1, col)).is_black())
-      && row != height - 1
+      && row != self.height() - 1
       && self.get((row + 1, col)).is_white()
     {
       return true;
