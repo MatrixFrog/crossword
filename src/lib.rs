@@ -1,3 +1,5 @@
+use Direction::*;
+use core::num;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -5,6 +7,10 @@ use std::fmt::Display;
 use encoding::DecoderTrap::Strict;
 use encoding::Encoding;
 use encoding::all::ISO_8859_1;
+
+mod checksum;
+
+use checksum::*;
 
 // Loosely based on
 // https://depth-first.com/articles/2021/12/16/a-beginners-guide-to-parsing-in-rust/
@@ -67,7 +73,7 @@ impl Scanner {
     Ok(())
   }
 
-  /// Take the next n bytes, or
+  /// Take the next `n`` bytes.
   fn take_n_bytes(&mut self, n: usize) -> Result<Vec<u8>, Error> {
     if self.cursor >= self.data.len() {
       return Err(Error::EofError(self.cursor));
@@ -90,13 +96,18 @@ impl Scanner {
     for (index, byte) in self.data[self.cursor..].iter().enumerate() {
       if *byte == 0 {
         let bytes = &self.data[self.cursor..self.cursor + index + 1];
-        assert_eq!(0x0, *bytes.last().unwrap());
         self.cursor += index + 1;
         return Ok(bytes.to_vec());
       }
     }
     return Err(Error::EofError(self.data.len()));
   }
+}
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum Direction {
+  Across,
+  Down,
 }
 
 #[derive(Debug)]
@@ -107,9 +118,9 @@ pub struct Puz {
   pub solve_state: Grid,
   pub title: String,
   pub author: String,
-  pub copyright: String,
-  pub clues: Vec<String>,
   pub notes: String,
+  pub numbered_squares: HashMap<u8, Pos>,
+  pub clues: HashMap<(u8, Direction), String>,
 }
 
 impl Puz {
@@ -117,7 +128,7 @@ impl Puz {
   pub fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
     let mut checksum_mismatches = vec![];
 
-    let cib_checksum_expected = Self::checksum(&data[0x2C..0x34], 0);
+    let cib_checksum_expected = checksum_region(&data[0x2C..0x34], 0);
 
     let mut scanner = Scanner::new(data);
 
@@ -167,7 +178,6 @@ impl Puz {
 
     let title = scanner.parse_nul_terminated_string()?;
     let author = scanner.parse_nul_terminated_string()?;
-    let copyright = scanner.parse_nul_terminated_string()?;
 
     let mut clues = Vec::with_capacity(num_clues as usize);
     for _ in 0..num_clues {
@@ -176,27 +186,15 @@ impl Puz {
 
     let notes = scanner.parse_nul_terminated_string()?;
 
-    // dbg!(&title, &author, &copyright, &notes);
-
-    // TODO: Store these as private data on the Puz object somehow.
-    #[allow(unused)] // For now
-    let numbered_squares = solution
-      .positions()
-      .filter(|&pos| solution.need_number_at(pos))
-      .enumerate()
-      .map(|(n, pos)| (n + 1, pos)) // Clue numbers start at 1, not 0.
-      .collect::<HashMap<usize, Pos>>();
-
     let overall_checksum_expected: u16 = {
-      let mut c = Self::checksum(&solution_bytes, cib_checksum);
-      c = Self::checksum(&solve_state_bytes, c);
-      c = Self::checksum_metadata_string(&title, c);
-      c = Self::checksum_metadata_string(&author, c);
-      c = Self::checksum_metadata_string(&copyright, c);
+      let mut c = checksum_region(&solution_bytes, cib_checksum);
+      c = checksum_region(&solve_state_bytes, c);
+      c = checksum_metadata_string(&title, c);
+      c = checksum_metadata_string(&author, c);
       for clue in clues.iter() {
-        c = Self::checksum_clue(&clue, c);
+        c = checksum_clue(&clue, c);
       }
-      c = Self::checksum_metadata_string(&notes, c);
+      c = checksum_metadata_string(&notes, c);
       c
     };
 
@@ -208,16 +206,15 @@ impl Puz {
       })
     }
 
-    let solution_checksum = Self::checksum(&solution_bytes, 0);
-    let grid_checksum = Self::checksum(&solve_state_bytes, 0);
+    let solution_checksum = checksum_region(&solution_bytes, 0);
+    let grid_checksum = checksum_region(&solve_state_bytes, 0);
     let mut partial_board_checksum = 0;
-    partial_board_checksum = Self::checksum_metadata_string(&title, partial_board_checksum);
-    partial_board_checksum = Self::checksum_metadata_string(&author, partial_board_checksum);
-    partial_board_checksum = Self::checksum_metadata_string(&copyright, partial_board_checksum);
+    partial_board_checksum = checksum_metadata_string(&title, partial_board_checksum);
+    partial_board_checksum = checksum_metadata_string(&author, partial_board_checksum);
     for clue in clues.iter() {
-      partial_board_checksum = Self::checksum_clue(clue, partial_board_checksum);
+      partial_board_checksum = checksum_clue(clue, partial_board_checksum);
     }
-    partial_board_checksum = Self::checksum_metadata_string(&notes, partial_board_checksum);
+    partial_board_checksum = checksum_metadata_string(&notes, partial_board_checksum);
 
     let expected_masked_checksums = [
       0x49 ^ (cib_checksum & 0xFF) as u8,
@@ -245,65 +242,70 @@ impl Puz {
       }
     }
 
+    let clues = clues
+      .into_iter()
+      .map(|clue| decode_str(&clue))
+      .collect::<Result<Vec<String>, _>>()?;
+
+    let (numbered_squares, clues) = allocate_clues(&solution, &clues);
+
     let puz = Self {
       width,
       height,
       solution,
       solve_state,
-      title: Self::decode_str(&title)?,
-      author: Self::decode_str(&author)?,
-      copyright: Self::decode_str(&copyright)?,
-      clues: clues
-        .into_iter()
-        .map(|clue| Self::decode_str(&clue))
-        .collect::<Result<Vec<_>, Error>>()?,
-      notes: Self::decode_str(&notes)?,
+      title: decode_str(&title)?,
+      author: decode_str(&author)?,
+      notes: decode_str(&notes)?,
+      numbered_squares,
+      clues,
     };
     Ok((puz, checksum_mismatches))
   }
+}
 
-  fn decode_str(bytes: &[u8]) -> Result<String, Error> {
-    assert_eq!(0x0, *bytes.last().unwrap());
+/// Turn a NUL-terminated ISO-8859-1-encoded string into a standard String.
+fn decode_str(bytes: &[u8]) -> Result<String, Error> {
+  assert_eq!(0x0, *bytes.last().unwrap());
 
-    ISO_8859_1
-      .decode(&bytes[0..bytes.len() - 1], Strict)
-      .map_err(|e| {
-        Error::Iso_8859_1Error(format!("Failed parsing '{:?}' as ISO-8859-1: {}", bytes, e))
-      })
-  }
+  ISO_8859_1
+    .decode(&bytes[0..bytes.len() - 1], Strict)
+    .map_err(|e| {
+      Error::Iso_8859_1Error(format!("Failed parsing '{:?}' as ISO-8859-1: {}", bytes, e))
+    })
+}
 
-  // https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5#checksums
-  #[must_use]
-  fn checksum(base: &[u8], input_checksum: u16) -> u16 {
-    let mut checksum = input_checksum;
-    for &byte in base {
-      if checksum & 0x0001_u16 != 0 {
-        checksum = (checksum >> 1) + 0x8000
-      } else {
-        checksum = checksum >> 1;
+fn allocate_clues(
+  grid: &Grid,
+  clue_list: &[String],
+) -> (HashMap<u8, Pos>, HashMap<(u8, Direction), String>) {
+  let mut clue_number: u8 = 1;
+  let mut numbered_squares = HashMap::new();
+  let mut clues = HashMap::with_capacity(clue_list.len());
+
+  let mut clue_iter = clue_list.into_iter();
+
+  for pos in grid.positions() {
+    let starts_across = grid.starts_across(pos);
+    let starts_down = grid.starts_down(pos);
+
+    if starts_across || starts_down {
+      numbered_squares.insert(clue_number, pos);
+      clue_number += 1;
+
+      if starts_across {
+        let clue = clue_iter.next().unwrap();
+        clues.insert((clue_number, Across), clue.clone());
       }
-      checksum = checksum.overflowing_add(byte as u16).0;
+
+      if starts_down {
+        let clue = clue_iter.next().unwrap();
+        clues.insert((clue_number, Down), clue.clone());
+      }
     }
-    checksum
   }
 
-  /// Part of the checksum calculations. For metadata (title, author, copyright, or notes),
-  /// we do nothing if the string is empty, but if it's not empty we include the \0 byte in
-  /// the calculation.
-  #[must_use]
-  fn checksum_metadata_string(s: &[u8], input_checksum: u16) -> u16 {
-    if s == b"\0" {
-      return input_checksum;
-    }
-
-    return Self::checksum(s, input_checksum);
-  }
-
-  /// Part of the checksum calculations. For clues, we do not include the trailing \0 byte.
-  #[must_use]
-  fn checksum_clue(s: &[u8], input_checksum: u16) -> u16 {
-    Self::checksum(&s[0..s.len() - 1], input_checksum)
-  }
+  (numbered_squares, clues)
 }
 
 /// A square in a crossword grid.
@@ -381,6 +383,7 @@ impl Grid {
     (self.0[0].len(), self.0.len())
   }
 
+  /// An iterator over all the positions of this grid, from left to right and top to bottom.
   fn positions(&self) -> GridPosIter {
     GridPosIter::new(self.size())
   }
@@ -404,22 +407,13 @@ impl Grid {
     self.enumerate().filter(|(_, sq)| sq.is_white())
   }
 
-  /// Whether there should be a number at the given position, because it
-  /// is the start of a word (either across or down).
-  fn need_number_at(&self, (row, col): Pos) -> bool {
+  /// Whether the given position is the start of an Across entry.
+  fn starts_across(&self, (row, col): Pos) -> bool {
     if self.get((row, col)).is_black() {
       return false;
     }
 
     let (width, height) = self.size();
-
-    if (row == 0 || self.get((row - 1, col)).is_black())
-      && row != height - 1
-      && self.get((row + 1, col)).is_white()
-    {
-      // Start of a "down" word.
-      return true;
-    }
 
     if (col == 0 || self.get((row, col - 1)).is_black())
       && col != width - 1
@@ -429,6 +423,22 @@ impl Grid {
       return true;
     }
 
+    return false;
+  }
+
+  fn starts_down(&self, (row, col): Pos) -> bool {
+    if self.get((row, col)).is_black() {
+      return false;
+    }
+
+    let (_, height) = self.size();
+
+    if (row == 0 || self.get((row - 1, col)).is_black())
+      && row != height - 1
+      && self.get((row + 1, col)).is_white()
+    {
+      return true;
+    }
     return false;
   }
 }
