@@ -1,5 +1,4 @@
 use Direction::*;
-use core::num;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -118,6 +117,7 @@ pub struct Puz {
   pub solve_state: Grid,
   pub title: String,
   pub author: String,
+  pub copyright: String,
   pub notes: String,
   pub numbered_squares: HashMap<u8, Pos>,
   pub clues: HashMap<(u8, Direction), String>,
@@ -178,6 +178,7 @@ impl Puz {
 
     let title = scanner.parse_nul_terminated_string()?;
     let author = scanner.parse_nul_terminated_string()?;
+    let copyright = scanner.parse_nul_terminated_string()?;
 
     let mut clues = Vec::with_capacity(num_clues as usize);
     for _ in 0..num_clues {
@@ -191,6 +192,7 @@ impl Puz {
       c = checksum_region(&solve_state_bytes, c);
       c = checksum_metadata_string(&title, c);
       c = checksum_metadata_string(&author, c);
+      c = checksum_metadata_string(&copyright, c);
       for clue in clues.iter() {
         c = checksum_clue(&clue, c);
       }
@@ -208,13 +210,17 @@ impl Puz {
 
     let solution_checksum = checksum_region(&solution_bytes, 0);
     let grid_checksum = checksum_region(&solve_state_bytes, 0);
-    let mut partial_board_checksum = 0;
-    partial_board_checksum = checksum_metadata_string(&title, partial_board_checksum);
-    partial_board_checksum = checksum_metadata_string(&author, partial_board_checksum);
-    for clue in clues.iter() {
-      partial_board_checksum = checksum_clue(clue, partial_board_checksum);
-    }
-    partial_board_checksum = checksum_metadata_string(&notes, partial_board_checksum);
+    let partial_board_checksum = {
+      let mut c = 0;
+      c = checksum_metadata_string(&title, c);
+      c = checksum_metadata_string(&author, c);
+      c = checksum_metadata_string(&copyright, c);
+      for clue in clues.iter() {
+        c = checksum_clue(clue, c);
+      }
+      c = checksum_metadata_string(&notes, c);
+      c
+    };
 
     let expected_masked_checksums = [
       0x49 ^ (cib_checksum & 0xFF) as u8,
@@ -256,6 +262,7 @@ impl Puz {
       solve_state,
       title: decode_str(&title)?,
       author: decode_str(&author)?,
+      copyright: decode_str(&copyright)?,
       notes: decode_str(&notes)?,
       numbered_squares,
       clues,
