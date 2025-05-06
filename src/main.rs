@@ -1,10 +1,11 @@
+use puzparser::ChecksumMismatch;
 use puzparser::{Error, Puz};
 use std::env;
 use std::fs;
 
-fn parse_puz(path: &str) -> Result<Puz, Error> {
+fn parse_puz(path: &str) -> Result<(Puz, Vec<ChecksumMismatch>), Error> {
   let data: Vec<u8> = fs::read(path)?;
-  Puz::parse(data, true)
+  Puz::parse(data)
 }
 
 fn main() -> Result<(), Error> {
@@ -19,8 +20,15 @@ fn main() -> Result<(), Error> {
       let puz_path = entry.unwrap().path();
       if let Some(p) = puz_path.to_str() {
         match parse_puz(p) {
-          Ok(puz) => {
-            println!("Parsed {} successfully from {}", puz.title, p);
+          Ok((puz, checksum_mismatches)) => {
+            if checksum_mismatches.is_empty() {
+              println!("Parsed '{}' successfully from {}", puz.title, p);
+            } else {
+              println!(
+                "Parsed '{}' with checksum mismatches: {:?}",
+                puz.title, checksum_mismatches
+              );
+            }
             success += 1;
           }
           Err(e) => {
@@ -33,8 +41,15 @@ fn main() -> Result<(), Error> {
     dbg!(success, failure);
   } else {
     match parse_puz(path) {
-      Ok(puz) => {
-        println!("Parsed {} successfully", puz.title);
+      Ok((puz, checksum_mismatches)) => {
+        if checksum_mismatches.is_empty() {
+          println!("Parsed '{}' successfully from {}", puz.title, path);
+        } else {
+          println!(
+            "Parsed '{}' with checksum mismatches: {:?}",
+            puz.title, checksum_mismatches
+          );
+        }
       }
       Err(e) => {
         println!("Failed with: {:?}", e);

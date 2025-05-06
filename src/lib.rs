@@ -113,12 +113,10 @@ pub struct Puz {
 }
 
 impl Puz {
-  pub fn parse_ignoring_checksums(data: Vec<u8>) -> Result<Self, Error> {
-    Self::parse(data, false)
-  }
-
   /// Create a Puz from the bytes of a `.puz` file.
-  pub fn parse(data: Vec<u8>, verify_checksums: bool) -> Result<Self, Error> {
+  pub fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
+    let mut checksum_mismatches = vec![];
+
     let cib_checksum_expected = Self::checksum(&data[0x2C..0x34], 0);
 
     let mut scanner = Scanner::new(data);
@@ -127,8 +125,12 @@ impl Puz {
     scanner.take_bytes(b"ACROSS&DOWN\0")?;
 
     let cib_checksum = scanner.parse_short()?;
-    if verify_checksums && cib_checksum != cib_checksum_expected {
-      return Err(Error::ChecksumError("CIB".into()));
+    if cib_checksum != cib_checksum_expected {
+      checksum_mismatches.push(ChecksumMismatch {
+        checksum: Checksum::CIB,
+        expected: cib_checksum_expected,
+        actual: cib_checksum,
+      });
     }
 
     let masked_checksums = scanner.take_n_bytes(8)?;
@@ -185,58 +187,65 @@ impl Puz {
       .map(|(n, pos)| (n + 1, pos)) // Clue numbers start at 1, not 0.
       .collect::<HashMap<usize, Pos>>();
 
-    if verify_checksums {
-      let overall_checksum_expected: u16 = {
-        let mut c = Self::checksum(&solution_bytes, cib_checksum);
-        c = Self::checksum(&solve_state_bytes, c);
-        c = Self::checksum_metadata_string(&title, c);
-        c = Self::checksum_metadata_string(&author, c);
-        c = Self::checksum_metadata_string(&copyright, c);
-        for clue in clues.iter() {
-          c = Self::checksum_clue(&clue, c);
-        }
-        c = Self::checksum_metadata_string(&notes, c);
-        c
-      };
-
-      if overall_checksum != overall_checksum_expected {
-        return Err(Error::ChecksumError(format!(
-          "Overall checksum: Expected {:#x} but got {:#x}",
-          overall_checksum_expected, overall_checksum,
-        )));
-      }
-
-      let solution_checksum = Self::checksum(&solution_bytes, 0);
-      let grid_checksum = Self::checksum(&solve_state_bytes, 0);
-      let mut partial_board_checksum = 0;
-      partial_board_checksum = Self::checksum_metadata_string(&title, partial_board_checksum);
-      partial_board_checksum = Self::checksum_metadata_string(&author, partial_board_checksum);
-      partial_board_checksum = Self::checksum_metadata_string(&copyright, partial_board_checksum);
+    let overall_checksum_expected: u16 = {
+      let mut c = Self::checksum(&solution_bytes, cib_checksum);
+      c = Self::checksum(&solve_state_bytes, c);
+      c = Self::checksum_metadata_string(&title, c);
+      c = Self::checksum_metadata_string(&author, c);
+      c = Self::checksum_metadata_string(&copyright, c);
       for clue in clues.iter() {
-        partial_board_checksum = Self::checksum_clue(clue, partial_board_checksum);
+        c = Self::checksum_clue(&clue, c);
       }
-      partial_board_checksum = Self::checksum_metadata_string(&notes, partial_board_checksum);
+      c = Self::checksum_metadata_string(&notes, c);
+      c
+    };
 
-      let expected_masked_checksums = [
-        0x49 ^ (cib_checksum & 0xFF) as u8,
-        0x43 ^ (solution_checksum & 0xFF) as u8,
-        0x48 ^ (grid_checksum & 0xFF) as u8,
-        0x45 ^ (partial_board_checksum & 0xFF) as u8,
-        0x41 ^ ((cib_checksum & 0xFF00) >> 8) as u8,
-        0x54 ^ ((solution_checksum & 0xFF00) >> 8) as u8,
-        0x45 ^ ((grid_checksum & 0xFF00) >> 8) as u8,
-        0x44 ^ ((partial_board_checksum & 0xFF00) >> 8) as u8,
-      ];
+    if overall_checksum != overall_checksum_expected {
+      checksum_mismatches.push(ChecksumMismatch {
+        checksum: Checksum::Overall,
+        expected: overall_checksum_expected,
+        actual: overall_checksum,
+      })
+    }
 
-      if masked_checksums != expected_masked_checksums {
-        return Err(Error::ChecksumError(format!(
-          "Masked checksums mismatch: Expected {:?} but got {:?}",
-          expected_masked_checksums, masked_checksums
-        )));
+    let solution_checksum = Self::checksum(&solution_bytes, 0);
+    let grid_checksum = Self::checksum(&solve_state_bytes, 0);
+    let mut partial_board_checksum = 0;
+    partial_board_checksum = Self::checksum_metadata_string(&title, partial_board_checksum);
+    partial_board_checksum = Self::checksum_metadata_string(&author, partial_board_checksum);
+    partial_board_checksum = Self::checksum_metadata_string(&copyright, partial_board_checksum);
+    for clue in clues.iter() {
+      partial_board_checksum = Self::checksum_clue(clue, partial_board_checksum);
+    }
+    partial_board_checksum = Self::checksum_metadata_string(&notes, partial_board_checksum);
+
+    let expected_masked_checksums = [
+      0x49 ^ (cib_checksum & 0xFF) as u8,
+      0x43 ^ (solution_checksum & 0xFF) as u8,
+      0x48 ^ (grid_checksum & 0xFF) as u8,
+      0x45 ^ (partial_board_checksum & 0xFF) as u8,
+      0x41 ^ ((cib_checksum & 0xFF00) >> 8) as u8,
+      0x54 ^ ((solution_checksum & 0xFF00) >> 8) as u8,
+      0x45 ^ ((grid_checksum & 0xFF00) >> 8) as u8,
+      0x44 ^ ((partial_board_checksum & 0xFF00) >> 8) as u8,
+    ];
+
+    assert_eq!(expected_masked_checksums.len(), masked_checksums.len());
+    for (i, (expected, actual)) in expected_masked_checksums
+      .iter()
+      .zip(masked_checksums.iter())
+      .enumerate()
+    {
+      if expected != actual {
+        checksum_mismatches.push(ChecksumMismatch {
+          checksum: Checksum::Masked(i),
+          expected: *expected as u16,
+          actual: *actual as u16,
+        })
       }
     }
 
-    Ok(Self {
+    let puz = Self {
       width,
       height,
       solution,
@@ -249,7 +258,8 @@ impl Puz {
         .map(|clue| Self::decode_str(&clue))
         .collect::<Result<Vec<_>, Error>>()?,
       notes: Self::decode_str(&notes)?,
-    })
+    };
+    Ok((puz, checksum_mismatches))
   }
 
   fn decode_str(bytes: &[u8]) -> Result<String, Error> {
@@ -484,11 +494,40 @@ pub enum Error {
   // Unexpectedly reached the end of the file.
   EofError(usize),
   ParseError(String),
-  ChecksumError(String),
   #[allow(non_camel_case_types)]
   Iso_8859_1Error(String),
   ScrambledError,
   IoError(std::io::Error),
+}
+
+pub struct ChecksumMismatch {
+  checksum: Checksum,
+  expected: u16,
+  actual: u16,
+}
+
+#[derive(Debug)]
+enum Checksum {
+  CIB,
+  Overall,
+  Masked(usize),
+}
+
+impl Display for Checksum {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{:?}", self)?;
+    Ok(())
+  }
+}
+
+impl Debug for ChecksumMismatch {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "Mismatch on checksum {}: Expected {:#x} but got {:#x}",
+      self.checksum, self.expected, self.actual
+    )
+  }
 }
 
 impl From<std::io::Error> for Error {
