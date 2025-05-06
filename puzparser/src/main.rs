@@ -45,7 +45,7 @@ fn main() -> Result<(), Error> {
       Ok((puz, checksum_mismatches)) => {
         if checksum_mismatches.is_empty() {
           println!("Parsed '{}' successfully from {}", puz.title, path);
-          // dbg!(puz);
+          dbg!(puz);
         } else {
           println!(
             "Parsed '{}' with checksum mismatches: {:?}",
