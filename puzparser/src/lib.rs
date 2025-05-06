@@ -564,6 +564,7 @@ mod tests {
     assert_eq!(puz.title, "Reference PUZ File");
     assert_eq!(puz.author, "Josh Myer");
     assert_eq!(puz.copyright, "Copyright (c) 2005 Josh Myer");
+    assert_eq!(puz.notes, "");
 
     #[rustfmt::skip]
     assert_eq!(puz.numbered_squares, HashMap::from([

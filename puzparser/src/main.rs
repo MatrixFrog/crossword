@@ -8,6 +8,7 @@ fn parse_puz(path: &str) -> Result<(Puz, Vec<ChecksumMismatch>), Error> {
   Puz::parse(data)
 }
 
+/// A simple CLI for testing PUZ parsing
 fn main() -> Result<(), Error> {
   let args: Vec<String> = env::args().collect();
 
@@ -44,6 +45,7 @@ fn main() -> Result<(), Error> {
       Ok((puz, checksum_mismatches)) => {
         if checksum_mismatches.is_empty() {
           println!("Parsed '{}' successfully from {}", puz.title, path);
+          // dbg!(puz);
         } else {
           println!(
             "Parsed '{}' with checksum mismatches: {:?}",
