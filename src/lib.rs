@@ -111,8 +111,6 @@ pub enum Direction {
 
 #[derive(Debug)]
 pub struct Puz {
-  pub width: usize,
-  pub height: usize,
   pub solution: Grid,
   pub solve_state: Grid,
   pub title: String,
@@ -256,8 +254,6 @@ impl Puz {
     let (numbered_squares, clues) = allocate_clues(&solution, &clues);
 
     let puz = Self {
-      width,
-      height,
       solution,
       solve_state,
       title: decode_str(&title)?,
