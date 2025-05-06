@@ -294,7 +294,6 @@ fn allocate_clues(
 
     if starts_across || starts_down {
       numbered_squares.insert(clue_number, pos);
-      clue_number += 1;
 
       if starts_across {
         let clue = clue_iter.next().unwrap();
@@ -305,6 +304,8 @@ fn allocate_clues(
         let clue = clue_iter.next().unwrap();
         clues.insert((clue_number, Down), clue.clone());
       }
+
+      clue_number += 1;
     }
   }
 
@@ -363,7 +364,7 @@ impl From<&u8> for Square {
 /// A position in a grid: (row, column)
 type Pos = (usize, usize);
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Grid(Vec<Vec<Square>>);
 
 impl Grid {
@@ -416,7 +417,7 @@ impl Grid {
       return false;
     }
 
-    let (width, height) = self.size();
+    let (width, _) = self.size();
 
     if (col == 0 || self.get((row, col - 1)).is_black())
       && col != width - 1
@@ -513,13 +514,14 @@ pub enum Error {
   IoError(std::io::Error),
 }
 
+#[derive(Eq, PartialEq)]
 pub struct ChecksumMismatch {
   checksum: Checksum,
   expected: u16,
   actual: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum Checksum {
   CIB,
   Overall,
@@ -546,5 +548,62 @@ impl Debug for ChecksumMismatch {
 impl From<std::io::Error> for Error {
   fn from(e: std::io::Error) -> Self {
     Self::IoError(e)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::fs;
+
+  #[test]
+  fn parse_v12_puzzle() {
+    let data: Vec<u8> = fs::read("puzzles/version-1.2-puzzle.puz").unwrap();
+    let (puz, checksum_mismatches) = Puz::parse(data).unwrap();
+    assert_eq!(checksum_mismatches, []);
+    assert_eq!(puz.title, "Reference PUZ File");
+    assert_eq!(puz.author, "Josh Myer");
+    assert_eq!(puz.copyright, "Copyright (c) 2005 Josh Myer");
+
+    #[rustfmt::skip]
+    assert_eq!(puz.numbered_squares, HashMap::from([
+      (1, (0, 1)),
+      (2, (1, 0)),
+      (3, (1, 3)),
+      (4, (3, 1)),
+    ]));
+
+    #[rustfmt::skip]
+    assert_eq!(
+      puz.clues,
+      HashMap::from([
+        ((1, Down), "Pumps your basement".into()), // SUMP
+        ((2, Across), "I'm ___, thanks for asking\\!".into()), // SUPER
+        ((3, Down), "Until".into()), // ERE
+        ((4, Across), "One step short of a pier".into()), // PIE
+      ])
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+      puz.solution.to_string(),
+      concat!(
+        "■S■■■\n",
+        "SUPER\n",
+        "■M■R■\n",
+        "■PIE■\n",
+      )
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+      puz.solve_state.to_string(),
+      concat!(
+        "■S■■■\n",
+        " U   \n",
+        "■M■ ■\n",
+        "■P  ■\n",
+      )
+    );
   }
 }
