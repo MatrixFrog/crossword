@@ -375,14 +375,69 @@ impl Cursor {
   pub fn from_grid(grid: &Grid) -> Self {
     let (pos, _) = grid.enumerate_white().next().unwrap();
 
-    let (row, col) = pos;
-    let direction = if col + 1 == grid.width() || grid.get((row, col + 1)).is_black() {
-      Down
-    } else {
-      Across
+    let mut cursor = Self {
+      pos,
+      direction: Across,
     };
 
-    Self { pos, direction }
+    cursor.adjust_direction(grid);
+
+    cursor
+  }
+
+  fn adjust_direction(&mut self, grid: &Grid) {
+    match self.direction {
+      Across => {
+        if grid.right_neighbor(self.pos).is_black() && grid.left_neighbor(self.pos).is_black() {
+          self.direction = Down;
+        }
+      }
+      Down => {
+        if grid.up_neighbor(self.pos).is_black() && grid.down_neighbor(self.pos).is_black() {
+          self.direction = Across;
+        }
+      }
+    }
+  }
+
+  pub fn up(&mut self, grid: &Grid) {
+    let (row, col) = self.pos;
+    if row == 0 {
+      return;
+    }
+
+    self.pos = (row - 1, col);
+    self.adjust_direction(grid);
+  }
+
+  pub fn down(&mut self, grid: &Grid) {
+    let (row, col) = self.pos;
+    if row + 1 == grid.height() {
+      return;
+    }
+
+    self.pos = (row + 1, col);
+    self.adjust_direction(grid);
+  }
+
+  pub fn left(&mut self, grid: &Grid) {
+    let (row, col) = self.pos;
+    if col == 0 {
+      return;
+    }
+
+    self.pos = (row, col - 1);
+    self.adjust_direction(grid);
+  }
+
+  pub fn right(&mut self, grid: &Grid) {
+    let (row, col) = self.pos;
+    if col == grid.width() {
+      return;
+    }
+
+    self.pos = (row, col + 1);
+    self.adjust_direction(grid);
   }
 }
 
@@ -441,35 +496,61 @@ impl Grid {
     self.enumerate().filter(|(_, sq)| sq.is_white())
   }
 
-  /// Whether the given position is the start of an Across entry.
-  fn starts_across(&self, (row, col): Pos) -> bool {
-    if self.get((row, col)).is_black() {
-      return false;
+  /// Returns the square immediately to the left of the given position, or
+  /// `Square::Black` if the given position is on the left edge of the grid.
+  fn left_neighbor(&self, (row, col): Pos) -> Square {
+    if col == 0 {
+      Square::Black
+    } else {
+      self.get((row, col - 1))
     }
-
-    if (col == 0 || self.get((row, col - 1)).is_black())
-      && col != self.width() - 1
-      && self.get((row, col + 1)).is_white()
-    {
-      // Start of an "across" word.
-      return true;
-    }
-
-    return false;
   }
 
-  fn starts_down(&self, (row, col): Pos) -> bool {
-    if self.get((row, col)).is_black() {
+  /// Returns the square immediately to the right of the given position, or
+  /// `Square::Black` if the given position is on the right edge of the grid.
+  fn right_neighbor(&self, (row, col): Pos) -> Square {
+    if col + 1 == self.width() {
+      Square::Black
+    } else {
+      self.get((row, col + 1))
+    }
+  }
+
+  /// Returns the square immediately above the given position, or
+  /// `Square::Black` if the given position is on the top edge of the grid.
+  fn up_neighbor(&self, (row, col): Pos) -> Square {
+    if row == 0 {
+      Square::Black
+    } else {
+      self.get((row - 1, col))
+    }
+  }
+
+  /// Returns the square immediately below the given position, or
+  /// `Square::Black` if the given position is on the bottom edge of the grid.
+  fn down_neighbor(&self, (row, col): Pos) -> Square {
+    if row + 1 == self.height() {
+      Square::Black
+    } else {
+      self.get((row + 1, col))
+    }
+  }
+
+  /// Whether the given position is the start of an Across entry.
+  fn starts_across(&self, pos: Pos) -> bool {
+    if self.get(pos).is_black() {
       return false;
     }
 
-    if (row == 0 || self.get((row - 1, col)).is_black())
-      && row != self.height() - 1
-      && self.get((row + 1, col)).is_white()
-    {
-      return true;
+    self.left_neighbor(pos).is_black() && self.right_neighbor(pos).is_white()
+  }
+
+  fn starts_down(&self, pos: Pos) -> bool {
+    if self.get(pos).is_black() {
+      return false;
     }
-    return false;
+
+    self.up_neighbor(pos).is_black() && self.down_neighbor(pos).is_white()
   }
 
   // Given a cursor, determine the position of the start of the word that contains that cursor.

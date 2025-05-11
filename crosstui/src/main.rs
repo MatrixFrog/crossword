@@ -123,14 +123,39 @@ impl App {
     match (key.modifiers, key.code) {
       (_, KeyCode::Esc | KeyCode::Char('q'))
       | (KeyModifiers::CONTROL, KeyCode::Char('c') | KeyCode::Char('C')) => self.quit(),
-      // Add other key handlers here.
+      (_, KeyCode::Up) => {
+        self.cursor_up();
+      }
+      (_, KeyCode::Down) => {
+        self.cursor_down();
+      }
+      (_, KeyCode::Left) => {
+        self.cursor_left();
+      }
+      (_, KeyCode::Right) => {
+        self.cursor_right();
+      }
       _ => {}
     }
+    dbg!(&self.cursor);
   }
 
   /// Set running to false to quit the application.
   fn quit(&mut self) {
     self.running = false;
+  }
+
+  fn cursor_up(&mut self) {
+    self.cursor.up(&self.puzzle.solve_state);
+  }
+  fn cursor_down(&mut self) {
+    self.cursor.down(&self.puzzle.solve_state);
+  }
+  fn cursor_left(&mut self) {
+    self.cursor.left(&self.puzzle.solve_state);
+  }
+  fn cursor_right(&mut self) {
+    self.cursor.right(&self.puzzle.solve_state);
   }
 
   // Determines how a particular square should be styled.
@@ -144,9 +169,22 @@ impl App {
 
     if self.cursor.direction == Across && row == cursor_row {
       let (col_start, col_end) = (min(col, cursor_col), max(col, cursor_col));
+      dbg!(col_start, col_end);
       if (col_start..col_end).any(|c| self.puzzle.solve_state.get((row, c)).is_black()) {
+        dbg!(
+          "standard",
+          (col_start..col_end)
+            .map(|c| self.puzzle.solve_state.get((row, c)))
+            .collect::<Vec<_>>()
+        );
         return SquareStyle::Standard;
       } else {
+        dbg!(
+          "word",
+          (col_start..col_end)
+            .map(|c| self.puzzle.solve_state.get((row, c)))
+            .collect::<Vec<_>>()
+        );
         return SquareStyle::Word;
       }
     }
@@ -178,9 +216,7 @@ impl App {
       Square::Black => Block::new()
         .style(Style::new().bg(Color::Black))
         .render(square_area, buf),
-      Square::Empty => Block::new()
-        .style(Style::new().bg(Color::White))
-        .render(square_area, buf),
+      Square::Empty => Block::new().style(style).render(square_area, buf),
       Square::Letter(c) => {
         Paragraph::new(c.to_string())
           .block(Block::new().style(style).padding(Padding::top(1)))
@@ -191,7 +227,7 @@ impl App {
   }
 }
 
-impl Widget for &App {
+impl<'a> Widget for &App {
   fn render(self, area: Rect, buf: &mut Buffer) {
     let [title_area, main_area] =
       Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(area);
