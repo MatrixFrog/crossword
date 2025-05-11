@@ -2,7 +2,8 @@ use std::cmp::{max, min};
 use std::{env, io};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use puzparser::{Cursor, Direction, Pos, Puz, Square};
+use puzparser::Direction::{Across, Down};
+use puzparser::{Cursor, Pos, Puz, Square};
 use ratatui::{
   DefaultTerminal, Frame,
   buffer::Buffer,
@@ -141,7 +142,7 @@ impl App {
     let (row, col) = pos;
     let (cursor_row, cursor_col) = self.cursor.pos;
 
-    if self.cursor.direction == Direction::Across && row == cursor_row {
+    if self.cursor.direction == Across && row == cursor_row {
       let (col_start, col_end) = (min(col, cursor_col), max(col, cursor_col));
       if (col_start..col_end).any(|c| self.puzzle.solve_state.get((row, c)).is_black()) {
         return SquareStyle::Standard;
@@ -150,7 +151,7 @@ impl App {
       }
     }
 
-    if self.cursor.direction == Direction::Down && col == cursor_col {
+    if self.cursor.direction == Down && col == cursor_col {
       let (row_start, row_end) = (min(row, cursor_row), max(row, cursor_row));
       if (row_start..row_end).any(|r| self.puzzle.solve_state.get((r, col)).is_black()) {
         return SquareStyle::Standard;
@@ -160,6 +161,16 @@ impl App {
     }
 
     SquareStyle::Standard
+  }
+
+  fn current_clue(&self) -> &str {
+    let pos = self.puzzle.solve_state.get_start(&self.cursor);
+    let clue_number = *self.puzzle.numbered_squares.get(&pos).unwrap();
+    self
+      .puzzle
+      .clues
+      .get(&(clue_number, self.cursor.direction))
+      .unwrap()
   }
 
   fn render_square(&self, square: Square, style: SquareStyle, square_area: Rect, buf: &mut Buffer) {
@@ -182,8 +193,8 @@ impl App {
 
 impl Widget for &App {
   fn render(self, area: Rect, buf: &mut Buffer) {
-    let vertical_layout = Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]);
-    let [title_area, main_area] = vertical_layout.areas(area);
+    let [title_area, main_area] =
+      Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(area);
 
     let title = Line::from(vec![
       "Ratatui Crossword".bold().blue(),
@@ -193,8 +204,11 @@ impl Widget for &App {
     .centered();
     title.render(title_area, buf);
 
+    let [puzzle_area, clue_area] =
+      Layout::horizontal([Constraint::Percentage(100), Constraint::Length(45)]).areas(main_area);
+
     let puzzle_area = center(
-      main_area,
+      puzzle_area,
       Constraint::Length(
         (self.puzzle.solution.width() * (1 + SQUARE_WIDTH as usize))
           .try_into()
@@ -223,6 +237,14 @@ impl Widget for &App {
       square_area.x = puzzle_area.x;
       square_area.y += SQUARE_HEIGHT + 1;
     }
+
+    Paragraph::new(self.current_clue())
+      .block(
+        Block::bordered()
+          .title(Line::from("Current clue").centered())
+          .padding(Padding::uniform(4)),
+      )
+      .render(clue_area, buf);
   }
 }
 

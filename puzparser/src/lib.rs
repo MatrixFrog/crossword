@@ -103,7 +103,7 @@ impl Scanner {
   }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum Direction {
   Across,
   Down,
@@ -117,7 +117,7 @@ pub struct Puz {
   pub author: String,
   pub copyright: String,
   pub notes: String,
-  pub numbered_squares: HashMap<u8, Pos>,
+  pub numbered_squares: HashMap<Pos, u8>,
   pub clues: HashMap<(u8, Direction), String>,
 }
 
@@ -281,7 +281,7 @@ fn decode_str(bytes: &[u8]) -> Result<String, Error> {
 fn allocate_clues(
   grid: &Grid,
   clue_list: &[String],
-) -> (HashMap<u8, Pos>, HashMap<(u8, Direction), String>) {
+) -> (HashMap<Pos, u8>, HashMap<(u8, Direction), String>) {
   let mut clue_number: u8 = 1;
   let mut numbered_squares = HashMap::new();
   let mut clues = HashMap::with_capacity(clue_list.len());
@@ -293,7 +293,7 @@ fn allocate_clues(
     let starts_down = grid.starts_down(pos);
 
     if starts_across || starts_down {
-      numbered_squares.insert(clue_number, pos);
+      numbered_squares.insert(pos, clue_number);
 
       if starts_across {
         let clue = clue_iter.next().unwrap();
@@ -377,9 +377,9 @@ impl Cursor {
 
     let (row, col) = pos;
     let direction = if col + 1 == grid.width() || grid.get((row, col + 1)).is_black() {
-      Direction::Down
+      Down
     } else {
-      Direction::Across
+      Across
     };
 
     Self { pos, direction }
@@ -470,6 +470,27 @@ impl Grid {
       return true;
     }
     return false;
+  }
+
+  // Given a cursor, determine the position of the start of the word that contains that cursor.
+  pub fn get_start(&self, cursor: &Cursor) -> Pos {
+    let mut pos = cursor.pos;
+    match cursor.direction {
+      Across => loop {
+        if self.starts_across(pos) {
+          return pos;
+        }
+        let (row, col) = pos;
+        pos = (row, col - 1);
+      },
+      Down => loop {
+        if self.starts_down(pos) {
+          return pos;
+        }
+        let (row, col) = pos;
+        pos = (row - 1, col);
+      },
+    }
   }
 }
 
@@ -594,10 +615,10 @@ mod tests {
 
     #[rustfmt::skip]
     assert_eq!(puz.numbered_squares, HashMap::from([
-      (1, (0, 1)),
-      (2, (1, 0)),
-      (3, (1, 3)),
-      (4, (3, 1)),
+      ((0, 1), 1),
+      ((1, 0), 2),
+      ((1, 3), 3),
+      ((3, 1), 4),
     ]));
 
     #[rustfmt::skip]
