@@ -322,12 +322,12 @@ pub enum Square {
 
 impl Square {
   /// Is this a black square (not to be confused with a blank (white) square)?
-  fn is_black(&self) -> bool {
+  pub fn is_black(&self) -> bool {
     *self == Self::Black
   }
 
   /// Is this a white square? A white square may currently have a letter or it may be blank.
-  fn is_white(&self) -> bool {
+  pub fn is_white(&self) -> bool {
     !self.is_black()
   }
 }
@@ -362,7 +362,29 @@ impl From<&u8> for Square {
 }
 
 /// A position in a grid: (row, column)
-type Pos = (usize, usize);
+pub type Pos = (usize, usize);
+
+#[derive(Debug)]
+pub struct Cursor {
+  pub pos: Pos,
+  pub direction: Direction,
+}
+
+impl Cursor {
+  // TODO: or should this be on Grid? `grid.make_cursor()` or something.
+  pub fn from_grid(grid: &Grid) -> Self {
+    let (pos, _) = grid.enumerate_white().next().unwrap();
+
+    let (row, col) = pos;
+    let direction = if col + 1 == grid.width() || grid.get((row, col + 1)).is_black() {
+      Direction::Down
+    } else {
+      Direction::Across
+    };
+
+    Self { pos, direction }
+  }
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Grid(Vec<Vec<Square>>);

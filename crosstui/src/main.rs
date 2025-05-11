@@ -1,12 +1,13 @@
+use std::cmp::{max, min};
 use std::{env, io};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use puzparser::{Puz, Square};
+use puzparser::{Cursor, Direction, Pos, Puz, Square};
 use ratatui::{
   DefaultTerminal, Frame,
   buffer::Buffer,
   layout::{Constraint, Flex, Layout, Rect},
-  style::{Color, Style, Stylize},
+  style::{Color, Modifier, Style, Stylize},
   text::Line,
   widgets::{Block, Padding, Paragraph, Widget},
 };
@@ -22,7 +23,8 @@ fn main() -> io::Result<()> {
     std::process::exit(1);
   }
 
-  let app = App::new(&args[1])?;
+  let puz = parse_puz(&args[1]);
+  let app = App::new(puz);
 
   let terminal = ratatui::init();
   let result = app.run(terminal);
@@ -30,27 +32,61 @@ fn main() -> io::Result<()> {
   result
 }
 
+pub fn parse_puz(path: &str) -> Puz {
+  let data: Vec<u8> = std::fs::read(path).unwrap_or_else(|err| {
+    println!("{:?}", err);
+    std::process::exit(1);
+  });
+  let (puzzle, checksum_mismatches) = Puz::parse(data).unwrap_or_else(|e| {
+    println!("Failed to parse .puz file: {:?}", e);
+    std::process::exit(2);
+  });
+
+  if !checksum_mismatches.is_empty() {
+    println!(
+      ".puz file parsing encountered checksum mismatches: {:?}",
+      checksum_mismatches
+    );
+    std::process::exit(3);
+  }
+  puzzle
+}
+
+#[derive(Debug)]
+enum SquareStyle {
+  // Default styling
+  Standard,
+  // The cursor is positioned on this square.
+  Cursor,
+  // This cursor is not on this square, but the word indicated by the cursor includes this square.
+  Word,
+}
+
+impl From<SquareStyle> for Style {
+  fn from(value: SquareStyle) -> Self {
+    let base_style = match value {
+      SquareStyle::Standard => Style::new().bg(Color::White),
+      SquareStyle::Cursor => Style::new().bg(Color::LightRed),
+      SquareStyle::Word => Style::new().bg(Color::LightYellow),
+    };
+    base_style.fg(Color::Black).add_modifier(Modifier::BOLD)
+  }
+}
+
 #[derive(Debug)]
 pub struct App {
   puzzle: Puz,
+  cursor: Cursor,
   running: bool,
 }
 
 impl App {
-  pub fn new(path: &str) -> Result<Self, io::Error> {
-    let data: Vec<u8> = std::fs::read(path)?;
-    let (puzzle, checksum_mismatches) = Puz::parse(data).unwrap_or_else(|e| {
-      println!("Failed to parse .puz file: {:?}", e);
-      std::process::exit(2);
-    });
-
-    if checksum_mismatches.is_empty() {
-      Ok(Self {
-        puzzle,
-        running: true,
-      })
-    } else {
-      todo!("Handle checksum errors")
+  fn new(puzzle: Puz) -> Self {
+    let cursor = Cursor::from_grid(&puzzle.solve_state);
+    Self {
+      puzzle,
+      cursor,
+      running: true,
     }
   }
 
@@ -95,6 +131,53 @@ impl App {
   fn quit(&mut self) {
     self.running = false;
   }
+
+  // Determines how a particular square should be styled.
+  fn square_style(&self, pos: Pos) -> SquareStyle {
+    if pos == self.cursor.pos {
+      return SquareStyle::Cursor;
+    }
+
+    let (row, col) = pos;
+    let (cursor_row, cursor_col) = self.cursor.pos;
+
+    if self.cursor.direction == Direction::Across && row == cursor_row {
+      let (col_start, col_end) = (min(col, cursor_col), max(col, cursor_col));
+      if (col_start..col_end).any(|c| self.puzzle.solve_state.get((row, c)).is_black()) {
+        return SquareStyle::Standard;
+      } else {
+        return SquareStyle::Word;
+      }
+    }
+
+    if self.cursor.direction == Direction::Down && col == cursor_col {
+      let (row_start, row_end) = (min(row, cursor_row), max(row, cursor_row));
+      if (row_start..row_end).any(|r| self.puzzle.solve_state.get((r, col)).is_black()) {
+        return SquareStyle::Standard;
+      } else {
+        return SquareStyle::Word;
+      }
+    }
+
+    SquareStyle::Standard
+  }
+
+  fn render_square(&self, square: Square, style: SquareStyle, square_area: Rect, buf: &mut Buffer) {
+    match square {
+      Square::Black => Block::new()
+        .style(Style::new().bg(Color::Black))
+        .render(square_area, buf),
+      Square::Empty => Block::new()
+        .style(Style::new().bg(Color::White))
+        .render(square_area, buf),
+      Square::Letter(c) => {
+        Paragraph::new(c.to_string())
+          .block(Block::new().style(style).padding(Padding::top(1)))
+          .centered()
+          .render(square_area, buf);
+      }
+    };
+  }
 }
 
 impl Widget for &App {
@@ -133,24 +216,8 @@ impl Widget for &App {
     for row in 0..self.puzzle.solve_state.height() {
       for col in 0..self.puzzle.solve_state.width() {
         let square = self.puzzle.solve_state.get((row, col));
-        match square {
-          Square::Black => Block::new()
-            .style(Style::new().bg(Color::Black))
-            .render(square_area, buf),
-          Square::Empty => Block::new()
-            .style(Style::new().bg(Color::White))
-            .render(square_area, buf),
-          Square::Letter(c) => {
-            Paragraph::new(c.to_string())
-              .block(
-                Block::new()
-                  .style(Style::new().bg(Color::White).fg(Color::Black))
-                  .padding(Padding::top(1)),
-              )
-              .centered()
-              .render(square_area, buf);
-          }
-        };
+        let style = self.square_style((row, col));
+        self.render_square(square, style, square_area, buf);
         square_area.x += SQUARE_WIDTH + 2;
       }
       square_area.x = puzzle_area.x;
