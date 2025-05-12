@@ -119,16 +119,24 @@ impl App {
       }
       KeyCode::Backspace => {
         self.puzzle.delete_square();
+        self.puzzle.backup_cursor();
       }
-      key_code => {
-        if let Some(letter) = key_code.as_char() {
-          if letter.is_ascii_alphabetic() {
-            self.puzzle.add_letter(letter)
-          } else if letter == ' ' {
-            self.puzzle.swap_cursor_direction();
-          }
+      KeyCode::Delete => {
+        self.puzzle.delete_square();
+      }
+      KeyCode::Tab => {
+        self.puzzle.advance_cursor_to_next_word();
+      }
+      KeyCode::Char(' ') => {
+        self.puzzle.swap_cursor_direction();
+      }
+      KeyCode::Char(letter) => {
+        if letter.is_ascii_alphabetic() {
+          self.puzzle.add_letter(letter);
+          self.puzzle.advance_cursor();
         }
       }
+      _ => {}
     }
   }
 

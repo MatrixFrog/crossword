@@ -9,6 +9,7 @@ use Direction::{Across, Down};
 use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::ops::Not;
 
 mod checksum;
 mod puz;
@@ -20,6 +21,16 @@ pub use puz::{ChecksumMismatch, Puz};
 pub enum Direction {
   Across,
   Down,
+}
+
+impl Not for Direction {
+  type Output = Self;
+  fn not(self) -> Self {
+    match self {
+      Across => Down,
+      Down => Across,
+    }
+  }
 }
 
 /// Represents a crossword puzzle and a Cursor. When implementing a crossword app,
@@ -109,17 +120,32 @@ impl Puzzle {
   /// Sets the current square to [Empty](Square::Empty) and moves the cursor back a square.
   pub fn delete_square(&mut self) {
     self.puz.solve_state.set(self.cursor.pos, Square::Empty);
+  }
+
+  /// Moves the cursor back one square, if possible. That is, one square to the left if
+  /// the current cursor direction is Across, and one square up, if the current direction
+  /// is down.
+  pub fn backup_cursor(&mut self) {
     self.cursor.backup(&self.puz.solve_state);
+  }
+
+  /// Moves the cursor forward one square, if possible. That is, one square to the right if
+  /// the current cursor direction is Across, and one square down, if the current direction
+  /// is down.
+  pub fn advance_cursor(&mut self) {
+    self.cursor.advance(&self.puz.solve_state);
+  }
+
+  /// Moves the cursor to the next word in the puzzle.
+  pub fn advance_cursor_to_next_word(&mut self) {
+    self.puz.solve_state.next_start(&mut self.cursor);
   }
 
   /// Attempts to swap the cursor direction. However, if the current square is
   /// only part of an across clue, the direction cannot be switched to down,
   /// and vice versa.
   pub fn swap_cursor_direction(&mut self) {
-    self.cursor.direction = match self.cursor.direction {
-      Across => Down,
-      Down => Across,
-    };
+    self.cursor.direction = !self.cursor.direction;
     self.cursor.adjust_direction(&self.puz.solve_state);
   }
 
@@ -257,6 +283,37 @@ impl Grid {
     self.0[r][c] = square;
   }
 
+  /// Moves the cursor to the next square after the current one that is the start of a
+  /// word in the same direction as the cursor's. If we are already on the last `Across`
+  /// word, moves to the start of the first `Down` word, and vice versa.
+  fn next_start(&self, cursor: &mut Cursor) {
+    let mut iter = GridPosIter {
+      pos: cursor.pos,
+      size: self.size(),
+    };
+
+    // Skip the current position.
+    iter.next();
+
+    for pos in iter {
+      if self.starts(pos, cursor.direction) {
+        cursor.pos = pos;
+        return;
+      }
+    }
+
+    // No more words found for the given direction; try the other one.
+    for pos in self.positions() {
+      if self.starts(pos, !cursor.direction) {
+        cursor.pos = pos;
+        cursor.direction = !cursor.direction;
+        return;
+      }
+    }
+
+    unreachable!();
+  }
+
   /// Returns the position of the next white square above `pos`.
   fn next_up_neighbor(&self, pos: Pos) -> Option<Pos> {
     let (mut row, col) = pos;
@@ -353,6 +410,13 @@ impl Grid {
     }
   }
 
+  fn starts(&self, pos: Pos, direction: Direction) -> bool {
+    match direction {
+      Across => self.starts_across(pos),
+      Down => self.starts_down(pos),
+    }
+  }
+
   /// Whether the given position is the start of an Across entry.
   fn starts_across(&self, pos: Pos) -> bool {
     if self.get(pos).is_black() {
@@ -362,6 +426,7 @@ impl Grid {
     self.left_neighbor(pos).is_black() && self.right_neighbor(pos).is_white()
   }
 
+  /// Whether the given position is the start of a Down entry.
   fn starts_down(&self, pos: Pos) -> bool {
     if self.get(pos).is_black() {
       return false;
@@ -443,7 +508,7 @@ impl Display for Grid {
 
 /// Represents the position of the user's currently-highlighted square, and the `Direction`
 /// of the word they are currently entering.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Cursor {
   /// The position of the currently-highlighted square.
   pos: Pos,
@@ -546,5 +611,75 @@ pub enum Error {
 impl From<std::io::Error> for Error {
   fn from(e: std::io::Error) -> Self {
     Self::IoError(e)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn basic_grid() -> Grid {
+    let grid_bytes = b"--.---.--.------";
+    let grid = Grid::parse(grid_bytes, 4, 4);
+
+    #[rustfmt::skip]
+    assert_eq!(
+      grid.to_string(),
+      concat!(
+        "\n",
+        "  ■ \n",
+        "  ■ \n",
+        " ■  \n",
+        "    \n",
+      )
+    );
+
+    grid
+  }
+
+  #[test]
+  fn grid_starts() {
+    let grid = basic_grid();
+
+    let across_starts = [(0, 0), (1, 0), (2, 2), (3, 0)];
+    let down_starts = [(0, 0), (0, 1), (0, 3), (2, 2)];
+
+    for pos in grid.positions() {
+      if across_starts.contains(&pos) {
+        assert!(grid.starts_across(pos));
+      } else {
+        assert!(!grid.starts_across(pos));
+      }
+
+      if down_starts.contains(&pos) {
+        assert!(grid.starts_down(pos));
+      } else {
+        assert!(!grid.starts_down(pos));
+      }
+    }
+
+    let mut cursor = Cursor::from_grid(&grid);
+
+    for pos in across_starts {
+      assert_eq!(
+        cursor,
+        Cursor {
+          pos,
+          direction: Across
+        }
+      );
+      grid.next_start(&mut cursor);
+    }
+
+    for pos in down_starts {
+      assert_eq!(
+        cursor,
+        Cursor {
+          pos,
+          direction: Down
+        }
+      );
+      grid.next_start(&mut cursor);
+    }
   }
 }
