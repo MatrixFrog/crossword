@@ -179,6 +179,8 @@ impl Puz {
 
 /// Turn a NUL-terminated ISO-8859-1-encoded string into a standard String.
 fn decode_str(bytes: &[u8]) -> Result<String, Error> {
+  // TODO: It looks like at least some puz files use UTF-8, so try using that
+  // instead, perhaps based on the version field.
   assert_eq!(0x0, *bytes.last().unwrap());
 
   ISO_8859_1
