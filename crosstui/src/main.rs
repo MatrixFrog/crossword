@@ -8,7 +8,7 @@ use ratatui::{
   layout::{Constraint, Flex, Layout, Rect},
   style::{Color, Modifier, Style, Stylize},
   text::Line,
-  widgets::{Block, Padding, Paragraph, Widget},
+  widgets::{Block, Padding, Paragraph, Widget, Wrap},
 };
 
 const SQUARE_WIDTH: u16 = 7;
@@ -210,6 +210,7 @@ impl<'a> Widget for &App {
         .render(clue_area, buf)
     } else {
       Paragraph::new(self.puzzle.current_clue())
+        .wrap(Wrap::default())
         .block(
           Block::bordered()
             .title(Line::from(" Current clue ").centered())
