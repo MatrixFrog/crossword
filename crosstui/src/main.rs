@@ -1,7 +1,7 @@
 use std::{env, io};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use puzparser::{Puzzle, Square, SquareStyle};
+use crossword::{Puzzle, Square, SquareStyle};
 use ratatui::{
   DefaultTerminal, Frame,
   buffer::Buffer,

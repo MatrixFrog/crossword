@@ -55,8 +55,7 @@ impl Scanner {
   }
 
   /// Take the next `expected.len()` bytes, if they match `expected`.
-  // TODO this probably needs a better name
-  fn take_bytes(&mut self, expected: &[u8]) -> Result<(), Error> {
+  fn take_exact(&mut self, expected: &[u8]) -> Result<(), Error> {
     for (i, expected_byte) in expected.iter().enumerate() {
       if let Some(b) = self.data.get(self.cursor + i) {
         if b != expected_byte {
@@ -134,7 +133,7 @@ impl Puz {
     let mut scanner = Scanner::new(data);
 
     let overall_checksum = scanner.parse_short()?;
-    scanner.take_bytes(b"ACROSS&DOWN\0")?;
+    scanner.take_exact(b"ACROSS&DOWN\0")?;
 
     let cib_checksum = scanner.parse_short()?;
     if cib_checksum != cib_checksum_expected {

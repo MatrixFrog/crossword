@@ -112,8 +112,15 @@ name = "crosstui"
 version = "0.1.0"
 dependencies = [
  "crossterm 0.29.0",
- "puzparser",
+ "crossword",
  "ratatui",
+]
+
+[[package]]
+name = "crossword"
+version = "0.1.0"
+dependencies = [
+ "encoding",
 ]
 
 [[package]]
@@ -433,13 +440,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "puzparser"
-version = "0.1.0"
-dependencies = [
- "encoding",
 ]
 
 [[package]]
