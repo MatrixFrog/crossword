@@ -220,7 +220,7 @@ impl<'a> Widget for &App {
   }
 }
 
-/// https://ratatui.rs/recipes/layout/center-a-widget/
+/// <https://ratatui.rs/recipes/layout/center-a-widget/>
 fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
   let [area] = Layout::horizontal([horizontal])
     .flex(Flex::Center)

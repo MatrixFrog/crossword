@@ -20,13 +20,20 @@ pub struct Puz {
   pub author: String,
   pub copyright: String,
   pub notes: String,
+  /// Mapping from grid positions to numbers.
   pub numbered_squares: HashMap<Pos, u8>,
+  /// Mapping from clue identifiers to clues. For instance the clue for 12 Down
+  /// can be found by calling `clues.get((12, Down))`.
   pub clues: HashMap<(u8, Direction), String>,
 }
 
 impl Puz {
-  /// Create a Puz from the bytes of a `.puz` file.
+  /// Creates a Puz from the bytes of a `.puz` file.
   pub fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
+    // There is no official spec for the puz file format but I'm following
+    // <https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5>
+    // here and it seems to work well.
+
     let mut checksum_mismatches = vec![];
 
     let cib_checksum_expected = checksum_region(&data[0x2C..0x34], 0);
@@ -306,6 +313,9 @@ impl Scanner {
   }
 }
 
+/// Returned when parsing a .puz file succeeded, but one or more of the checksums
+/// in the file didn't match the expected value. May indicate a corrupted .puz file,
+/// or a bug in this crate.
 #[derive(Eq, PartialEq)]
 pub struct ChecksumMismatch {
   checksum: Checksum,

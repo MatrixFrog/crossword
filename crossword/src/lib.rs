@@ -1,3 +1,10 @@
+//! This crate is meant to be used as the foundation for a crossword puzzle app.
+//! It provides no UI itself, but see `crosstui` for an example of how you can use it
+//! to produce a crossword app.
+//!
+//! Puzzles are loaded from `.puz` files, a de facto standard format for crossword puzzles.
+//! You can find `.puz` files to download on many crossword sites.
+
 use Direction::{Across, Down};
 use std::cmp::{max, min};
 use std::fmt::Debug;
@@ -8,12 +15,15 @@ mod puz;
 
 pub use puz::{ChecksumMismatch, Puz};
 
+/// The two crossword directions: `Across` and `Down`
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum Direction {
   Across,
   Down,
 }
 
+/// Represents a crossword puzzle and a Cursor. When implementing a crossword app,
+/// this will be the main structure you will use.
 #[derive(Debug)]
 pub struct Puzzle {
   puz: Puz,
@@ -21,6 +31,7 @@ pub struct Puzzle {
 }
 
 impl Puzzle {
+  /// Creates a Puzzle from the bytes of a `.puz` file.
   pub fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
     let (puz, checksum_mismatches) = Puz::parse(data)?;
     let cursor = Cursor::from_grid(&puz.solve_state);
@@ -28,10 +39,12 @@ impl Puzzle {
     Ok((puzzle, checksum_mismatches))
   }
 
+  /// Whether the puzzle is fully filled in, and matches the solution.
   pub fn is_solved(&self) -> bool {
     self.grid().is_filled() && *self.grid() == self.puz.solution
   }
 
+  /// Returns a reference to the current puzzle grid.
   pub fn grid(&self) -> &Grid {
     &self.puz.solve_state
   }
@@ -41,6 +54,7 @@ impl Puzzle {
   }
 
   /// Determines how a particular square should be styled.
+  /// See [SquareStyle].
   pub fn square_style(&self, pos: Pos) -> SquareStyle {
     if pos == self.cursor.pos {
       return SquareStyle::Cursor;
@@ -70,6 +84,7 @@ impl Puzzle {
     SquareStyle::Standard
   }
 
+  /// Returns the text of the clue corresponding to the [Cursor].
   pub fn current_clue(&self) -> &str {
     let pos = self.puz.solve_state.get_start(&self.cursor);
     let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
@@ -80,8 +95,7 @@ impl Puzzle {
       .unwrap()
   }
 
-  /// Called when a letter is entered. Sets the current square to that letter
-  /// and advances the cursor.
+  /// Writes the given letter to the current square, and advances the cursor.
   pub fn add_letter(&mut self, letter: char) {
     assert!(letter.is_ascii_alphabetic());
 
@@ -92,8 +106,7 @@ impl Puzzle {
     self.cursor.advance(&self.puz.solve_state);
   }
 
-  /// Called when a letter is deleted (such as the user pressing backspace).
-  /// Removes the current letter and moves the cursor back a square.
+  /// Sets the current square to [Empty](Square::Empty) and moves the cursor back a square.
   pub fn delete_square(&mut self) {
     self.puz.solve_state.set(self.cursor.pos, Square::Empty);
     self.cursor.backup(&self.puz.solve_state);
@@ -124,31 +137,35 @@ impl Puzzle {
   }
 }
 
+/// The type returned from [Puzzle::square_style].
 #[derive(Debug)]
 pub enum SquareStyle {
-  // Default styling
+  /// Default styling
   Standard,
-  // The cursor is positioned on this square.
+  /// The cursor is positioned on this square.
   Cursor,
-  // This cursor is not on this square, but the word indicated by the cursor includes this square.
+  /// The cursor is not on this square, but the word indicated by the cursor includes this square.
   Word,
 }
 
 /// A square in a crossword grid.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Square {
+  /// A black square where nothing can be entered.
   Black,
+  /// A square where a letter could be entered, but that is currently empty.
   Empty,
+  /// A square with a letter written in it.
   Letter(char),
 }
 
 impl Square {
-  /// Is this a black square (not to be confused with a blank (white) square)?
+  /// Whether this is [Square::Black].
   pub fn is_black(&self) -> bool {
     *self == Self::Black
   }
 
-  /// Is this a white square? A white square may currently have a letter or it may be blank.
+  /// Whether this is not a black square, i.e. either a [Square::Empty] or [Square::Letter].
   pub fn is_white(&self) -> bool {
     !self.is_black()
   }
@@ -186,6 +203,8 @@ impl From<&u8> for Square {
 /// A position in a grid: (row, column)
 pub type Pos = (usize, usize);
 
+/// A grid of squares. Used to represent the current state of a partially-solved puzzle,
+/// or the solution of a puzzle.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Grid(Vec<Vec<Square>>);
 
@@ -209,10 +228,12 @@ impl Grid {
     (self.width(), self.height())
   }
 
+  /// The width of this grid.
   pub fn width(&self) -> usize {
     self.0[0].len()
   }
 
+  /// The height of this grid.
   pub fn height(&self) -> usize {
     self.0.len()
   }
@@ -227,6 +248,7 @@ impl Grid {
     !self.0.iter().flatten().any(|&sq| sq == Square::Empty)
   }
 
+  /// Returns the [Square] at the given [Pos].
   pub fn get(&self, (r, c): Pos) -> Square {
     self.0[r][c]
   }
@@ -385,9 +407,13 @@ impl Display for Grid {
   }
 }
 
+/// Represents the position of the user's currently-highlighted square, and the `Direction`
+/// of the word they are currently entering.
 #[derive(Debug)]
 pub struct Cursor {
+  /// The position of the currently-highlighted square.
   pub pos: Pos,
+  /// The current direction.
   pub direction: Direction,
 }
 
@@ -475,14 +501,20 @@ impl Cursor {
   }
 }
 
+/// The errors that may be produced by functions in this crate.
 #[derive(Debug)]
 pub enum Error {
-  // Unexpectedly reached the end of the file.
+  /// Unexpectedly reached the end of the file at the given byte index.
   EofError(usize),
+  /// Something went wrong while parsing a .puz file.
   ParseError(String),
+  /// Got an error while decoding a string, possibly because it was incorrectly
+  /// encoding using another encoding instead of ISO-8859-1.
   #[allow(non_camel_case_types)]
   Iso_8859_1Error(String),
+  /// The given puz file was marked as "scrambled" which this crate doesn't support.
   ScrambledError,
+  /// An [I/O error](std::io::Error) occurred.
   IoError(std::io::Error),
 }
 
