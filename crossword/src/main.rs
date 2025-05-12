@@ -1,5 +1,5 @@
-use crossword::ChecksumMismatch;
-use crossword::{Error, Puz};
+use crossword::{ChecksumMismatch, Error, Puz};
+
 use std::env;
 use std::fs;
 
