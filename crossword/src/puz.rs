@@ -6,7 +6,7 @@ use std::fmt::Display;
 
 use encoding::DecoderTrap::Strict;
 use encoding::Encoding;
-use encoding::all::ISO_8859_1;
+use encoding::all::{ISO_8859_1, UTF_8};
 
 use crate::checksum::*;
 
@@ -177,17 +177,20 @@ impl Puz {
   }
 }
 
-/// Turn a NUL-terminated ISO-8859-1-encoded string into a standard String.
+/// Turns a NUL-terminated string into a standard String. Uses UTF-8 first, and then
+/// ISO-8859-1 if that fails.
 fn decode_str(bytes: &[u8]) -> Result<String, Error> {
-  // TODO: It looks like at least some puz files use UTF-8, so try using that
-  // instead, perhaps based on the version field.
   assert_eq!(0x0, *bytes.last().unwrap());
 
-  ISO_8859_1
-    .decode(&bytes[0..bytes.len() - 1], Strict)
-    .map_err(|e| {
-      Error::Iso_8859_1Error(format!("Failed parsing '{:?}' as ISO-8859-1: {}", bytes, e))
+  let bytes = &bytes[0..bytes.len() - 1];
+  UTF_8.decode(bytes, Strict).or_else(|_| {
+    ISO_8859_1.decode(bytes, Strict).map_err(|e| {
+      Error::EncodingError(format!(
+        "Failed parsing '{:?}' after trying UTF-8 and ISO-8859: {}",
+        bytes, e
+      ))
     })
+  })
 }
 
 fn allocate_clues(
@@ -346,5 +349,65 @@ impl Display for Checksum {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{:?}", self)?;
     Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::{collections::HashMap, fs};
+
+  #[test]
+  fn parse_v12_puzzle() {
+    let data: Vec<u8> = fs::read("puzzles/version-1.2-puzzle.puz").unwrap();
+    let (puz, checksum_mismatches) = Puz::parse(data).unwrap();
+    assert_eq!(checksum_mismatches, []);
+    assert_eq!(puz.title, "Reference PUZ File");
+    assert_eq!(puz.author, "Josh Myer");
+    assert_eq!(puz.copyright, "Copyright (c) 2005 Josh Myer");
+    assert_eq!(puz.notes, "");
+
+    #[rustfmt::skip]
+    assert_eq!(puz.numbered_squares, HashMap::from([
+      ((0, 1), 1),
+      ((1, 0), 2),
+      ((1, 3), 3),
+      ((3, 1), 4),
+    ]));
+
+    #[rustfmt::skip]
+    assert_eq!(
+      puz.clues,
+      HashMap::from([
+        ((1, Down), "Pumps your basement".into()), // SUMP
+        ((2, Across), "I'm ___, thanks for asking\\!".into()), // SUPER
+        ((3, Down), "Until".into()), // ERE
+        ((4, Across), "One step short of a pier".into()), // PIE
+      ])
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+      puz.solution.to_string(),
+      concat!(
+        "\n",
+        "■S■■■\n",
+        "SUPER\n",
+        "■M■R■\n",
+        "■PIE■\n",
+      )
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+      puz.solve_state.to_string(),
+      concat!(
+        "\n",
+        "■S■■■\n",
+        " U   \n",
+        "■M■ ■\n",
+        "■P  ■\n",
+      )
+    );
   }
 }

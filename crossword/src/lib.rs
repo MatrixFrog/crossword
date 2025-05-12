@@ -205,7 +205,7 @@ pub type Pos = (usize, usize);
 
 /// A grid of squares. Used to represent the current state of a partially-solved puzzle,
 /// or the solution of a puzzle.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Grid(Vec<Vec<Square>>);
 
 impl Grid {
@@ -395,7 +395,7 @@ impl Iterator for GridIter<'_> {
   }
 }
 
-impl Display for Grid {
+impl Debug for Grid {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     for row in &self.0 {
       for sq in row {
@@ -404,6 +404,12 @@ impl Display for Grid {
       writeln!(f)?;
     }
     Ok(())
+  }
+}
+
+impl Display for Grid {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "\n{:?}", self)
   }
 }
 
@@ -509,9 +515,8 @@ pub enum Error {
   /// Something went wrong while parsing a .puz file.
   ParseError(String),
   /// Got an error while decoding a string, possibly because it was incorrectly
-  /// encoding using another encoding instead of ISO-8859-1.
-  #[allow(non_camel_case_types)]
-  Iso_8859_1Error(String),
+  /// encoded or because this library attempted to use the wrong encoding.
+  EncodingError(String),
   /// The given puz file was marked as "scrambled" which this crate doesn't support.
   ScrambledError,
   /// An [I/O error](std::io::Error) occurred.
@@ -521,63 +526,5 @@ pub enum Error {
 impl From<std::io::Error> for Error {
   fn from(e: std::io::Error) -> Self {
     Self::IoError(e)
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use std::{collections::HashMap, fs};
-
-  #[test]
-  fn parse_v12_puzzle() {
-    let data: Vec<u8> = fs::read("puzzles/version-1.2-puzzle.puz").unwrap();
-    let (puz, checksum_mismatches) = Puz::parse(data).unwrap();
-    assert_eq!(checksum_mismatches, []);
-    assert_eq!(puz.title, "Reference PUZ File");
-    assert_eq!(puz.author, "Josh Myer");
-    assert_eq!(puz.copyright, "Copyright (c) 2005 Josh Myer");
-    assert_eq!(puz.notes, "");
-
-    #[rustfmt::skip]
-    assert_eq!(puz.numbered_squares, HashMap::from([
-      ((0, 1), 1),
-      ((1, 0), 2),
-      ((1, 3), 3),
-      ((3, 1), 4),
-    ]));
-
-    #[rustfmt::skip]
-    assert_eq!(
-      puz.clues,
-      HashMap::from([
-        ((1, Down), "Pumps your basement".into()), // SUMP
-        ((2, Across), "I'm ___, thanks for asking\\!".into()), // SUPER
-        ((3, Down), "Until".into()), // ERE
-        ((4, Across), "One step short of a pier".into()), // PIE
-      ])
-    );
-
-    #[rustfmt::skip]
-    assert_eq!(
-      puz.solution.to_string(),
-      concat!(
-        "■S■■■\n",
-        "SUPER\n",
-        "■M■R■\n",
-        "■PIE■\n",
-      )
-    );
-
-    #[rustfmt::skip]
-    assert_eq!(
-      puz.solve_state.to_string(),
-      concat!(
-        "■S■■■\n",
-        " U   \n",
-        "■M■ ■\n",
-        "■P  ■\n",
-      )
-    );
   }
 }
