@@ -257,21 +257,6 @@ impl Grid {
     self.0[r][c] = square;
   }
 
-  /// Returns an iterator over all the squares in the grid,
-  /// paired with their position
-  pub fn enumerate(&self) -> impl Iterator<Item = (Pos, Square)> {
-    GridIter {
-      pos_iter: self.positions(),
-      grid: self,
-    }
-  }
-
-  /// Returns an iterator over all the white squares in the grid,
-  /// paired with their position
-  pub fn enumerate_white(&self) -> impl Iterator<Item = (Pos, Square)> {
-    self.enumerate().filter(|(_, sq)| sq.is_white())
-  }
-
   /// Returns the square immediately to the left of the given position, or
   /// `Square::Black` if the given position is on the left edge of the grid.
   fn left_neighbor(&self, (row, col): Pos) -> Square {
@@ -382,19 +367,6 @@ impl Iterator for GridPosIter {
   }
 }
 
-struct GridIter<'a> {
-  grid: &'a Grid,
-  pos_iter: GridPosIter,
-}
-
-impl Iterator for GridIter<'_> {
-  type Item = (Pos, Square);
-  fn next(&mut self) -> Option<Self::Item> {
-    let pos = self.pos_iter.next()?;
-    Some((pos, self.grid.get(pos)))
-  }
-}
-
 impl Debug for Grid {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     for row in &self.0 {
@@ -425,7 +397,11 @@ pub struct Cursor {
 
 impl Cursor {
   pub fn from_grid(grid: &Grid) -> Self {
-    let (pos, _) = grid.enumerate_white().next().unwrap();
+    let pos = grid
+      .positions()
+      .filter(|&p| grid.get(p).is_white())
+      .next()
+      .unwrap();
 
     let mut cursor = Self {
       pos,
