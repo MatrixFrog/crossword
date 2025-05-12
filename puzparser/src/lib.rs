@@ -1,4 +1,5 @@
 use Direction::*;
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -109,6 +110,8 @@ pub enum Direction {
   Down,
 }
 
+/// A `Puz` is essentially only the data in a .puz file. For an interactively solvable
+/// puzzle, use `Puzzle` which includes a Cursor.
 #[derive(Debug)]
 pub struct Puz {
   pub solution: Grid,
@@ -312,6 +315,111 @@ fn allocate_clues(
   (numbered_squares, clues)
 }
 
+#[derive(Debug)]
+pub struct Puzzle {
+  puz: Puz,
+  cursor: Cursor,
+}
+
+impl Puzzle {
+  pub fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
+    let (puz, checksum_mismatches) = Puz::parse(data)?;
+    let cursor = Cursor::from_grid(&puz.solve_state);
+    let puzzle = Self { puz, cursor };
+    Ok((puzzle, checksum_mismatches))
+  }
+
+  pub fn is_solved(&self) -> bool {
+    self.grid().is_filled() && *self.grid() == self.puz.solution
+  }
+
+  pub fn grid(&self) -> &Grid {
+    &self.puz.solve_state
+  }
+
+  pub fn title(&self) -> &str {
+    &self.puz.title
+  }
+
+  /// Determines how a particular square should be styled.
+  pub fn square_style(&self, pos: Pos) -> SquareStyle {
+    if pos == self.cursor.pos {
+      return SquareStyle::Cursor;
+    }
+
+    let (row, col) = pos;
+    let (cursor_row, cursor_col) = self.cursor.pos;
+
+    if self.cursor.direction == Across && row == cursor_row {
+      let (col_start, col_end) = (min(col, cursor_col), max(col, cursor_col));
+      if (col_start..col_end).any(|c| self.grid().get((row, c)).is_black()) {
+        return SquareStyle::Standard;
+      } else {
+        return SquareStyle::Word;
+      }
+    }
+
+    if self.cursor.direction == Down && col == cursor_col {
+      let (row_start, row_end) = (min(row, cursor_row), max(row, cursor_row));
+      if (row_start..row_end).any(|r| self.grid().get((r, col)).is_black()) {
+        return SquareStyle::Standard;
+      } else {
+        return SquareStyle::Word;
+      }
+    }
+
+    SquareStyle::Standard
+  }
+
+  pub fn current_clue(&self) -> &str {
+    let pos = self.puz.solve_state.get_start(&self.cursor);
+    let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
+    self
+      .puz
+      .clues
+      .get(&(clue_number, self.cursor.direction))
+      .unwrap()
+  }
+
+  pub fn on_letter_entered(&mut self, letter: char) {
+    assert!(letter.is_ascii_alphabetic());
+
+    self
+      .puz
+      .solve_state
+      .set(self.cursor.pos, Square::Letter(letter.to_ascii_uppercase()));
+    self.cursor.advance(&self.puz.solve_state);
+  }
+
+  pub fn on_space_entered(&mut self) {
+    self.puz.solve_state.set(self.cursor.pos, Square::Empty);
+    self.cursor.advance(&self.puz.solve_state);
+  }
+
+  pub fn cursor_up(&mut self) {
+    self.cursor.up(&self.puz.solve_state);
+  }
+  pub fn cursor_down(&mut self) {
+    self.cursor.down(&self.puz.solve_state);
+  }
+  pub fn cursor_left(&mut self) {
+    self.cursor.left(&self.puz.solve_state);
+  }
+  pub fn cursor_right(&mut self) {
+    self.cursor.right(&self.puz.solve_state);
+  }
+}
+
+#[derive(Debug)]
+pub enum SquareStyle {
+  // Default styling
+  Standard,
+  // The cursor is positioned on this square.
+  Cursor,
+  // This cursor is not on this square, but the word indicated by the cursor includes this square.
+  Word,
+}
+
 /// A square in a crossword grid.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Square {
@@ -364,83 +472,6 @@ impl From<&u8> for Square {
 /// A position in a grid: (row, column)
 pub type Pos = (usize, usize);
 
-#[derive(Debug)]
-pub struct Cursor {
-  pub pos: Pos,
-  pub direction: Direction,
-}
-
-impl Cursor {
-  // TODO: or should this be on Grid? `grid.make_cursor()` or something.
-  pub fn from_grid(grid: &Grid) -> Self {
-    let (pos, _) = grid.enumerate_white().next().unwrap();
-
-    let mut cursor = Self {
-      pos,
-      direction: Across,
-    };
-
-    cursor.adjust_direction(grid);
-
-    cursor
-  }
-
-  fn adjust_direction(&mut self, grid: &Grid) {
-    match self.direction {
-      Across => {
-        if grid.right_neighbor(self.pos).is_black() && grid.left_neighbor(self.pos).is_black() {
-          self.direction = Down;
-        }
-      }
-      Down => {
-        if grid.up_neighbor(self.pos).is_black() && grid.down_neighbor(self.pos).is_black() {
-          self.direction = Across;
-        }
-      }
-    }
-  }
-
-  pub fn up(&mut self, grid: &Grid) {
-    let (row, col) = self.pos;
-    if row == 0 {
-      return;
-    }
-
-    self.pos = (row - 1, col);
-    self.adjust_direction(grid);
-  }
-
-  pub fn down(&mut self, grid: &Grid) {
-    let (row, col) = self.pos;
-    if row + 1 == grid.height() {
-      return;
-    }
-
-    self.pos = (row + 1, col);
-    self.adjust_direction(grid);
-  }
-
-  pub fn left(&mut self, grid: &Grid) {
-    let (row, col) = self.pos;
-    if col == 0 {
-      return;
-    }
-
-    self.pos = (row, col - 1);
-    self.adjust_direction(grid);
-  }
-
-  pub fn right(&mut self, grid: &Grid) {
-    let (row, col) = self.pos;
-    if col == grid.width() {
-      return;
-    }
-
-    self.pos = (row, col + 1);
-    self.adjust_direction(grid);
-  }
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct Grid(Vec<Vec<Square>>);
 
@@ -477,8 +508,17 @@ impl Grid {
     GridPosIter::new(self.size())
   }
 
+  /// Whether this grid is fully filled in -- that is, has no `Square::Empty` in it.
+  fn is_filled(&self) -> bool {
+    !self.0.iter().flatten().any(|&sq| sq == Square::Empty)
+  }
+
   pub fn get(&self, (r, c): Pos) -> Square {
     self.0[r][c]
+  }
+
+  fn set(&mut self, (r, c): Pos, square: Square) {
+    self.0[r][c] = square;
   }
 
   /// Returns an iterator over all the squares in the grid,
@@ -628,6 +668,89 @@ impl Display for Grid {
       writeln!(f)?;
     }
     Ok(())
+  }
+}
+
+#[derive(Debug)]
+pub struct Cursor {
+  pub pos: Pos,
+  pub direction: Direction,
+}
+
+impl Cursor {
+  pub fn from_grid(grid: &Grid) -> Self {
+    let (pos, _) = grid.enumerate_white().next().unwrap();
+
+    let mut cursor = Self {
+      pos,
+      direction: Across,
+    };
+
+    cursor.adjust_direction(grid);
+
+    cursor
+  }
+
+  fn adjust_direction(&mut self, grid: &Grid) {
+    match self.direction {
+      Across => {
+        if grid.right_neighbor(self.pos).is_black() && grid.left_neighbor(self.pos).is_black() {
+          self.direction = Down;
+        }
+      }
+      Down => {
+        if grid.up_neighbor(self.pos).is_black() && grid.down_neighbor(self.pos).is_black() {
+          self.direction = Across;
+        }
+      }
+    }
+  }
+
+  fn advance(&mut self, grid: &Grid) {
+    match self.direction {
+      Across => self.right(grid),
+      Down => self.down(grid),
+    }
+  }
+
+  pub fn up(&mut self, grid: &Grid) {
+    if grid.up_neighbor(self.pos).is_black() {
+      return;
+    }
+
+    let (row, col) = self.pos;
+    self.pos = (row - 1, col);
+    self.adjust_direction(grid);
+  }
+
+  pub fn down(&mut self, grid: &Grid) {
+    if grid.down_neighbor(self.pos).is_black() {
+      return;
+    }
+
+    let (row, col) = self.pos;
+    self.pos = (row + 1, col);
+    self.adjust_direction(grid);
+  }
+
+  pub fn left(&mut self, grid: &Grid) {
+    if grid.left_neighbor(self.pos).is_black() {
+      return;
+    }
+
+    let (row, col) = self.pos;
+    self.pos = (row, col - 1);
+    self.adjust_direction(grid);
+  }
+
+  pub fn right(&mut self, grid: &Grid) {
+    if grid.right_neighbor(self.pos).is_black() {
+      return;
+    }
+
+    let (row, col) = self.pos;
+    self.pos = (row, col + 1);
+    self.adjust_direction(grid);
   }
 }
 

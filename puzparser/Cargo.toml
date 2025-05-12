@@ -1,5 +1,5 @@
 [package]
-name = "puzparser"
+name = "puzparser" # TODO rename this crate now that it does a bit more than parsing.
 version = "0.1.0"
 edition = "2024"
 
