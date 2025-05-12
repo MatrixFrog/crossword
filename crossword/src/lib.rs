@@ -257,23 +257,59 @@ impl Grid {
     self.0[r][c] = square;
   }
 
-  /// Returns the square immediately to the left of the given position, or
-  /// `Square::Black` if the given position is on the left edge of the grid.
-  fn left_neighbor(&self, (row, col): Pos) -> Square {
-    if col == 0 {
-      Square::Black
-    } else {
-      self.get((row, col - 1))
+  /// Returns the position of the next white square above `pos`.
+  fn next_up_neighbor(&self, pos: Pos) -> Option<Pos> {
+    let (mut row, col) = pos;
+    loop {
+      if row == 0 {
+        return None;
+      }
+      row -= 1;
+      if self.get((row, col)).is_white() {
+        return Some((row, col));
+      }
     }
   }
 
-  /// Returns the square immediately to the right of the given position, or
-  /// `Square::Black` if the given position is on the right edge of the grid.
-  fn right_neighbor(&self, (row, col): Pos) -> Square {
-    if col + 1 == self.width() {
-      Square::Black
-    } else {
-      self.get((row, col + 1))
+  /// Returns the position of the next white square below `pos`.
+  fn next_down_neighbor(&self, pos: Pos) -> Option<Pos> {
+    let (mut row, col) = pos;
+    loop {
+      if row + 1 == self.height() {
+        return None;
+      }
+      row += 1;
+      if self.get((row, col)).is_white() {
+        return Some((row, col));
+      }
+    }
+  }
+
+  /// Returns the position of the next white square to the left of `pos`.
+  fn next_left_neighbor(&self, pos: Pos) -> Option<Pos> {
+    let (row, mut col) = pos;
+    loop {
+      if col == 0 {
+        return None;
+      }
+      col -= 1;
+      if self.get((row, col)).is_white() {
+        return Some((row, col));
+      }
+    }
+  }
+
+  /// Returns the position of the next white square to the right of `pos`.
+  fn next_right_neighbor(&self, pos: Pos) -> Option<Pos> {
+    let (row, mut col) = pos;
+    loop {
+      if col + 1 == self.width() {
+        return None;
+      }
+      col += 1;
+      if self.get((row, col)).is_white() {
+        return Some((row, col));
+      }
     }
   }
 
@@ -294,6 +330,26 @@ impl Grid {
       Square::Black
     } else {
       self.get((row + 1, col))
+    }
+  }
+
+  /// Returns the square immediately to the left of the given position, or
+  /// `Square::Black` if the given position is on the left edge of the grid.
+  fn left_neighbor(&self, (row, col): Pos) -> Square {
+    if col == 0 {
+      Square::Black
+    } else {
+      self.get((row, col - 1))
+    }
+  }
+
+  /// Returns the square immediately to the right of the given position, or
+  /// `Square::Black` if the given position is on the right edge of the grid.
+  fn right_neighbor(&self, (row, col): Pos) -> Square {
+    if col + 1 == self.width() {
+      Square::Black
+    } else {
+      self.get((row, col + 1))
     }
   }
 
@@ -390,9 +446,9 @@ impl Display for Grid {
 #[derive(Debug)]
 pub struct Cursor {
   /// The position of the currently-highlighted square.
-  pub pos: Pos,
+  pos: Pos,
   /// The current direction.
-  pub direction: Direction,
+  direction: Direction,
 }
 
 impl Cursor {
@@ -443,43 +499,31 @@ impl Cursor {
   }
 
   pub fn up(&mut self, grid: &Grid) {
-    if grid.up_neighbor(self.pos).is_black() {
-      return;
+    if let Some(pos) = grid.next_up_neighbor(self.pos) {
+      self.pos = pos;
+      self.adjust_direction(grid);
     }
-
-    let (row, col) = self.pos;
-    self.pos = (row - 1, col);
-    self.adjust_direction(grid);
   }
 
   pub fn down(&mut self, grid: &Grid) {
-    if grid.down_neighbor(self.pos).is_black() {
-      return;
+    if let Some(pos) = grid.next_down_neighbor(self.pos) {
+      self.pos = pos;
+      self.adjust_direction(grid);
     }
-
-    let (row, col) = self.pos;
-    self.pos = (row + 1, col);
-    self.adjust_direction(grid);
   }
 
   pub fn left(&mut self, grid: &Grid) {
-    if grid.left_neighbor(self.pos).is_black() {
-      return;
+    if let Some(pos) = grid.next_left_neighbor(self.pos) {
+      self.pos = pos;
+      self.adjust_direction(grid);
     }
-
-    let (row, col) = self.pos;
-    self.pos = (row, col - 1);
-    self.adjust_direction(grid);
   }
 
   pub fn right(&mut self, grid: &Grid) {
-    if grid.right_neighbor(self.pos).is_black() {
-      return;
+    if let Some(pos) = grid.next_right_neighbor(self.pos) {
+      self.pos = pos;
+      self.adjust_direction(grid);
     }
-
-    let (row, col) = self.pos;
-    self.pos = (row, col + 1);
-    self.adjust_direction(grid);
   }
 }
 
