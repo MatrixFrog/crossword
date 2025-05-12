@@ -380,7 +380,9 @@ impl Puzzle {
       .unwrap()
   }
 
-  pub fn on_letter_entered(&mut self, letter: char) {
+  /// Called when a letter is entered. Sets the current square to that letter
+  /// and advances the cursor.
+  pub fn add_letter(&mut self, letter: char) {
     assert!(letter.is_ascii_alphabetic());
 
     self
@@ -390,9 +392,22 @@ impl Puzzle {
     self.cursor.advance(&self.puz.solve_state);
   }
 
-  pub fn on_space_entered(&mut self) {
+  /// Called when a letter is deleted (such as the user pressing backspace).
+  /// Removes the current letter and moves the cursor back a square.
+  pub fn delete_square(&mut self) {
     self.puz.solve_state.set(self.cursor.pos, Square::Empty);
-    self.cursor.advance(&self.puz.solve_state);
+    self.cursor.backup(&self.puz.solve_state);
+  }
+
+  /// Attempts to swap the cursor direction. However, if the current square is
+  /// only part of an across clue, the direction cannot be switched to down,
+  /// and vice versa.
+  pub fn swap_cursor_direction(&mut self) {
+    self.cursor.direction = match self.cursor.direction {
+      Across => Down,
+      Down => Across,
+    };
+    self.cursor.adjust_direction(&self.puz.solve_state);
   }
 
   pub fn cursor_up(&mut self) {
@@ -709,6 +724,13 @@ impl Cursor {
     match self.direction {
       Across => self.right(grid),
       Down => self.down(grid),
+    }
+  }
+
+  fn backup(&mut self, grid: &Grid) {
+    match self.direction {
+      Across => self.left(grid),
+      Down => self.up(grid),
     }
   }
 

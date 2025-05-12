@@ -117,10 +117,15 @@ impl App {
       KeyCode::Right => {
         self.puzzle.cursor_right();
       }
+      KeyCode::Backspace => {
+        self.puzzle.delete_square();
+      }
       key_code => {
         if let Some(letter) = key_code.as_char() {
           if letter.is_ascii_alphabetic() {
-            self.puzzle.on_letter_entered(letter)
+            self.puzzle.add_letter(letter)
+          } else if letter == ' ' {
+            self.puzzle.swap_cursor_direction();
           }
         }
       }
