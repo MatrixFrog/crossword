@@ -7,7 +7,7 @@ use ratatui::{
   buffer::Buffer,
   layout::{Constraint, Flex, Layout, Rect},
   style::{Color, Modifier, Style, Stylize},
-  text::Line,
+  text::{Line, Text},
   widgets::{Block, Padding, Paragraph, Widget, Wrap},
 };
 
@@ -166,12 +166,16 @@ impl<'a> Widget for &App {
     let [title_area, main_area] =
       Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(area);
 
-    let title = Line::from(vec![
-      "Crosstui".bold().light_blue(),
-      ": ".bold(),
-      self.puzzle.title().bold(),
-    ])
-    .centered();
+    let title = Text::from(vec![
+      Line::from(""),
+      Line::from(vec![
+        "Crosstui".light_blue(),
+        ": ".into(),
+        self.puzzle.title().into(),
+      ])
+      .bold()
+      .centered(),
+    ]);
     title.render(title_area, buf);
 
     let [puzzle_area, right_area] =
