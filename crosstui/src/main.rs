@@ -118,11 +118,11 @@ impl App {
         self.puzzle.cursor_right();
       }
       KeyCode::Backspace => {
-        self.puzzle.delete_square();
+        self.puzzle.erase_letter();
         self.puzzle.backup_cursor();
       }
       KeyCode::Delete => {
-        self.puzzle.delete_square();
+        self.puzzle.erase_letter();
       }
       KeyCode::Tab => {
         self.puzzle.advance_cursor_to_next_word();
@@ -167,14 +167,14 @@ impl<'a> Widget for &App {
       Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(area);
 
     let title = Line::from(vec![
-      "Ratatui Crossword".bold().blue(),
+      "Crosstui".bold().light_blue(),
       ": ".bold(),
       self.puzzle.title().bold(),
     ])
     .centered();
     title.render(title_area, buf);
 
-    let [puzzle_area, clue_area] =
+    let [puzzle_area, right_area] =
       Layout::horizontal([Constraint::Percentage(100), Constraint::Length(45)]).areas(main_area);
 
     let puzzle_area = center(
@@ -207,6 +207,16 @@ impl<'a> Widget for &App {
       square_area.x = puzzle_area.x;
       square_area.y += SQUARE_HEIGHT + 1;
     }
+
+    let [instructions_area, clue_area] =
+      Layout::vertical([Constraint::Length(10), Constraint::Percentage(100)]).areas(right_area);
+
+    Paragraph::new(Line::from(vec![
+      "Instructions: ".bold(),
+      "Use the arrow keys, space, and tab, to navigate the puzzle. Press escape to exit.".gray(),
+    ]))
+    .wrap(Wrap::default())
+    .render(instructions_area, buf);
 
     if self.puzzle.is_solved() {
       Paragraph::new("You solved it!")

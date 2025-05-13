@@ -106,7 +106,7 @@ impl Puzzle {
       .unwrap()
   }
 
-  /// Writes the given letter to the current square, and advances the cursor.
+  /// Writes the given letter to the current square.
   pub fn add_letter(&mut self, letter: char) {
     assert!(letter.is_ascii_alphabetic());
 
@@ -114,11 +114,10 @@ impl Puzzle {
       .puz
       .solve_state
       .set(self.cursor.pos, Square::Letter(letter.to_ascii_uppercase()));
-    self.cursor.advance(&self.puz.solve_state);
   }
 
-  /// Sets the current square to [Empty](Square::Empty) and moves the cursor back a square.
-  pub fn delete_square(&mut self) {
+  /// Sets the current square to [Empty](Square::Empty).
+  pub fn erase_letter(&mut self) {
     self.puz.solve_state.set(self.cursor.pos, Square::Empty);
   }
 
