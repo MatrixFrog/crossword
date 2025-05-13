@@ -212,8 +212,12 @@ impl<'a> Widget for &App {
       square_area.y += SQUARE_HEIGHT + 1;
     }
 
-    let [instructions_area, clue_area] =
-      Layout::vertical([Constraint::Length(10), Constraint::Percentage(100)]).areas(right_area);
+    let [instructions_area, clue_area, metadata_area] = Layout::vertical([
+      Constraint::Length(10),
+      Constraint::Percentage(100),
+      Constraint::Length(15),
+    ])
+    .areas(right_area);
 
     Paragraph::new(Line::from(vec![
       "Instructions: ".bold(),
@@ -240,6 +244,27 @@ impl<'a> Widget for &App {
         )
         .render(clue_area, buf);
     }
+
+    let mut metadata: Vec<Line> = vec!["".into()];
+    let author = self.puzzle.author();
+    if !author.is_empty() {
+      metadata.push("".into());
+      metadata.push(Line::from(vec!["Author: ".bold(), author.into()]))
+    }
+    let notes = self.puzzle.notes();
+    if !notes.is_empty() {
+      metadata.push("".into());
+      metadata.push(notes.into());
+    }
+    let copyright = self.puzzle.copyright();
+    if !copyright.is_empty() {
+      metadata.push("".into());
+      metadata.push(copyright.into());
+    }
+
+    Paragraph::new(metadata)
+      .wrap(Wrap::default())
+      .render(metadata_area, buf);
   }
 }
 

@@ -64,6 +64,18 @@ impl Puzzle {
     &self.puz.title
   }
 
+  pub fn author(&self) -> &str {
+    &self.puz.author
+  }
+
+  pub fn copyright(&self) -> &str {
+    &self.puz.copyright
+  }
+
+  pub fn notes(&self) -> &str {
+    &self.puz.notes
+  }
+
   /// Determines how a particular square should be styled.
   /// See [SquareStyle].
   pub fn square_style(&self, pos: Pos) -> SquareStyle {
