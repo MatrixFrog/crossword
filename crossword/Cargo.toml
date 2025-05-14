@@ -1,6 +1,10 @@
 [package]
 name = "crossword"
 version = "0.1.0"
+license-file = "../LICENSE"
+description = "Library for crossword puzzles including .puz file parsing"
+homepage = "https://github.com/MatrixFrog/crossword"
+readme = "README.md"
 edition = "2024"
 
 [dependencies]
