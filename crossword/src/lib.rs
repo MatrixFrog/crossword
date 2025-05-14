@@ -296,16 +296,16 @@ impl Grid {
     self.0[r][c] = square;
   }
 
-  /// Moves the cursor to the next square after the current one that is the start of a
-  /// word in the same direction as the cursor's. If we are already on the last `Across`
+  /// Moves the cursor to the next word after the current one that is in
+  /// the same direction as the cursor. If we are already on the last `Across`
   /// word, moves to the start of the first `Down` word, and vice versa.
   fn next_start(&self, cursor: &mut Cursor) {
     let mut iter = GridPosIter {
-      pos: cursor.pos,
+      pos: self.get_start(cursor),
       size: self.size(),
     };
 
-    // Skip the current position.
+    // Skip the start of the current word.
     iter.next();
 
     for pos in iter {
@@ -448,7 +448,8 @@ impl Grid {
     self.up_neighbor(pos).is_black() && self.down_neighbor(pos).is_white()
   }
 
-  // Given a cursor, determine the position of the start of the word that contains that cursor.
+  /// Determines the position of the start of the word that contains the cursor,
+  /// and is in the same direction as the cursor.
   fn get_start(&self, cursor: &Cursor) -> Pos {
     let mut pos = cursor.pos;
     match cursor.direction {
