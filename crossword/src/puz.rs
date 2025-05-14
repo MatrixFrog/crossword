@@ -13,23 +13,23 @@ use crate::checksum::*;
 /// A `Puz` is essentially only the data in a .puz file. For an interactively solvable
 /// puzzle, use `Puzzle` which includes a Cursor.
 #[derive(Debug)]
-pub struct Puz {
-  pub solution: Grid,
-  pub solve_state: Grid,
-  pub title: String,
-  pub author: String,
-  pub copyright: String,
-  pub notes: String,
+pub(crate) struct Puz {
+  pub(crate) solution: Grid,
+  pub(crate) solve_state: Grid,
+  pub(crate) title: String,
+  pub(crate) author: String,
+  pub(crate) copyright: String,
+  pub(crate) notes: String,
   /// Mapping from grid positions to numbers.
-  pub numbered_squares: HashMap<Pos, u8>,
+  pub(crate) numbered_squares: HashMap<Pos, u8>,
   /// Mapping from clue identifiers to clues. For instance the clue for 12 Down
   /// can be found by calling `clues.get((12, Down))`.
-  pub clues: HashMap<(u8, Direction), String>,
+  pub(crate) clues: HashMap<(u8, Direction), String>,
 }
 
 impl Puz {
   /// Creates a Puz from the bytes of a `.puz` file.
-  pub fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
+  pub(crate) fn parse(data: Vec<u8>) -> Result<(Self, Vec<ChecksumMismatch>), Error> {
     // There is no official spec for the puz file format but I'm following
     // <https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5>
     // here and it seems to work well.
@@ -304,8 +304,7 @@ impl Scanner {
 
   /// Parses a C-style NUL-terminated string, including the NUL byte. In
   /// this function, we return just the raw bytes as they appear in the
-  /// file. Converting them to a string (using the ISO-8859-1 encoding)
-  /// is done later.
+  /// file. Converting them to a string is done later.
   fn parse_nul_terminated_string(&mut self) -> Result<Vec<u8>, Error> {
     for (index, byte) in self.data[self.cursor..].iter().enumerate() {
       if *byte == 0 {

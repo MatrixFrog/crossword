@@ -6,6 +6,7 @@
 //! You can find `.puz` files to download on many crossword sites.
 
 use Direction::{Across, Down};
+use puz::Puz;
 use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -14,7 +15,7 @@ use std::ops::Not;
 mod checksum;
 mod puz;
 
-pub use puz::{ChecksumMismatch, Puz};
+pub use puz::ChecksumMismatch;
 
 /// The two crossword directions: `Across` and `Down`
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -174,7 +175,8 @@ impl Puzzle {
   }
 }
 
-/// The type returned from [Puzzle::square_style].
+/// Indicates how a particular square should look. For instance, [Standard](Self::Standard)
+/// might map to white, [Cursor](Self::Cursor) to yellow, and [Word](Self::Word) to gray.
 #[derive(Debug)]
 pub enum SquareStyle {
   /// Default styling
@@ -198,12 +200,12 @@ pub enum Square {
 
 impl Square {
   /// Whether this is [Square::Black].
-  pub fn is_black(&self) -> bool {
+  fn is_black(&self) -> bool {
     *self == Self::Black
   }
 
   /// Whether this is not a black square, i.e. either a [Square::Empty] or [Square::Letter].
-  pub fn is_white(&self) -> bool {
+  fn is_white(&self) -> bool {
     !self.is_black()
   }
 }
@@ -238,7 +240,7 @@ impl From<&u8> for Square {
 }
 
 /// A position in a grid: (row, column)
-pub type Pos = (usize, usize);
+type Pos = (usize, usize);
 
 /// A grid of squares. Used to represent the current state of a partially-solved puzzle,
 /// or the solution of a puzzle.
@@ -447,7 +449,7 @@ impl Grid {
   }
 
   // Given a cursor, determine the position of the start of the word that contains that cursor.
-  pub fn get_start(&self, cursor: &Cursor) -> Pos {
+  fn get_start(&self, cursor: &Cursor) -> Pos {
     let mut pos = cursor.pos;
     match cursor.direction {
       Across => loop {
@@ -520,7 +522,7 @@ impl Display for Grid {
 /// Represents the position of the user's currently-highlighted square, and the `Direction`
 /// of the word they are currently entering.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Cursor {
+struct Cursor {
   /// The position of the currently-highlighted square.
   pos: Pos,
   /// The current direction.
@@ -528,7 +530,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-  pub fn from_grid(grid: &Grid) -> Self {
+  fn from_grid(grid: &Grid) -> Self {
     let pos = grid
       .positions()
       .filter(|&p| grid.get(p).is_white())
@@ -574,28 +576,28 @@ impl Cursor {
     }
   }
 
-  pub fn up(&mut self, grid: &Grid) {
+  fn up(&mut self, grid: &Grid) {
     if let Some(pos) = grid.next_up_neighbor(self.pos) {
       self.pos = pos;
       self.adjust_direction(grid);
     }
   }
 
-  pub fn down(&mut self, grid: &Grid) {
+  fn down(&mut self, grid: &Grid) {
     if let Some(pos) = grid.next_down_neighbor(self.pos) {
       self.pos = pos;
       self.adjust_direction(grid);
     }
   }
 
-  pub fn left(&mut self, grid: &Grid) {
+  fn left(&mut self, grid: &Grid) {
     if let Some(pos) = grid.next_left_neighbor(self.pos) {
       self.pos = pos;
       self.adjust_direction(grid);
     }
   }
 
-  pub fn right(&mut self, grid: &Grid) {
+  fn right(&mut self, grid: &Grid) {
     if let Some(pos) = grid.next_right_neighbor(self.pos) {
       self.pos = pos;
       self.adjust_direction(grid);
