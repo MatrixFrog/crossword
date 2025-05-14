@@ -1,9 +1,13 @@
 [package]
 name = "crosstui"
-version = "0.1.0"
-edition = "2024"
+description = "Solve crossword puzzles in your terminal"
+license-file = "../LICENSE"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
 
 [dependencies]
-crossword = { path = "../crossword" }
+crossword = { path = "../crossword", version = "0.1.0" }
 crossterm = "0.29.0"
 ratatui = "0.29.0"

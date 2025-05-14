@@ -1,3 +1,9 @@
 [workspace]
 resolver = "2"
 members = ["crosstui", "crossword"]
+
+[workspace.package]
+version = "0.1.0"
+homepage = "https://github.com/MatrixFrog/crossword"
+repository = "https://github.com/MatrixFrog/crossword"
+edition = "2024"
