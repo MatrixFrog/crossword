@@ -102,7 +102,7 @@ impl Puz {
       c = checksum_metadata_string(&author, c);
       c = checksum_metadata_string(&copyright, c);
       for clue in clues.iter() {
-        c = checksum_clue(&clue, c);
+        c = checksum_clue(clue, c);
       }
       c = checksum_metadata_string(&notes, c);
       c
@@ -201,7 +201,7 @@ fn allocate_clues(
   let mut numbered_squares = HashMap::new();
   let mut clues = HashMap::with_capacity(clue_list.len());
 
-  let mut clue_iter = clue_list.into_iter();
+  let mut clue_iter = clue_list.iter();
 
   for pos in grid.positions() {
     let starts_across = grid.starts_across(pos);
@@ -263,7 +263,7 @@ impl Scanner {
     if let Some(b1) = self.data.get(self.cursor) {
       if let Some(b2) = self.data.get(self.cursor + 1) {
         self.cursor += 2;
-        return Ok(((*b2 as u16) << 8 | (*b1 as u16)).into());
+        return Ok((*b2 as u16) << 8 | (*b1 as u16));
       }
     }
     Err(Error::EofError(self.cursor))
@@ -313,7 +313,7 @@ impl Scanner {
         return Ok(bytes.to_vec());
       }
     }
-    return Err(Error::EofError(self.data.len()));
+    Err(Error::EofError(self.data.len()))
   }
 }
 

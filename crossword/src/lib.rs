@@ -531,11 +531,7 @@ struct Cursor {
 
 impl Cursor {
   fn from_grid(grid: &Grid) -> Self {
-    let pos = grid
-      .positions()
-      .filter(|&p| grid.get(p).is_white())
-      .next()
-      .unwrap();
+    let pos = grid.positions().find(|&p| grid.get(p).is_white()).unwrap();
 
     let mut cursor = Self {
       pos,

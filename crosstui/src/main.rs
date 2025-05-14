@@ -161,7 +161,7 @@ impl App {
   }
 }
 
-impl<'a> Widget for &App {
+impl Widget for &App {
   fn render(self, area: Rect, buf: &mut Buffer) {
     let [title_area, main_area] =
       Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(area);
