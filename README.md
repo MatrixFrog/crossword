@@ -1,6 +1,8 @@
-# Crossword
+# Crossword and Crosstui
 
-This is an experimental project for solving crosswords in the terminal. I built it mainly because I wanted to build something fun with [Ratatui], a library for building UIs that run in the terminal. It's still a work in progress but if you like crosswords and running things in the terminal, please give it a try!
+This is an experimental project for solving crosswords in the terminal. I built it mainly because I wanted to build something fun with [Ratatui], a library for TUIs (user interfaces that run in the terminal).
+
+It's still a work in progress but if you like crosswords and running things in the terminal, please give it a try!
 
 ## To play a crossword
 
