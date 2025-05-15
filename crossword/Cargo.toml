@@ -1,6 +1,6 @@
 [package]
 name = "crossword"
-license-file = "../LICENSE"
+license = "AGPL-3.0-only"
 description = "Library for crossword puzzles including .puz file parsing"
 readme = "README.md"
 version.workspace = true

@@ -1,7 +1,7 @@
 [package]
 name = "crosstui"
 description = "Solve crossword puzzles in your terminal"
-license-file = "../LICENSE"
+license = "AGPL-3.0-only"
 version.workspace = true
 homepage.workspace = true
 repository.workspace = true
