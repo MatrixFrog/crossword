@@ -34,8 +34,8 @@ impl Not for Direction {
   }
 }
 
-/// Represents a crossword puzzle and a Cursor. When implementing a crossword app,
-/// this will be the main structure you will use.
+/// Represents a crossword puzzle and its cursor (position and direction).
+/// When implementing a crossword app, this will be the main structure you will use.
 #[derive(Debug)]
 pub struct Puzzle {
   puz: Puz,
@@ -108,7 +108,7 @@ impl Puzzle {
     SquareStyle::Standard
   }
 
-  /// Returns the text of the clue corresponding to the [Cursor].
+  /// Returns the text of the current clue.
   pub fn current_clue(&self) -> &str {
     let pos = self.puz.solve_state.get_start(&self.cursor);
     let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
@@ -245,7 +245,7 @@ impl From<&u8> for Square {
 }
 
 /// A position in a grid: (row, column)
-type Pos = (usize, usize);
+pub type Pos = (usize, usize);
 
 /// A grid of squares. Used to represent the current state of a partially-solved puzzle,
 /// or the solution of a puzzle.
@@ -555,7 +555,7 @@ impl Cursor {
 
         // Move one square right, or loop back to the start of the word.
         if col == grid.width() - 1 || grid.get((row, col + 1)).is_black() {
-          (_, col) = grid.get_start(&self);
+          (_, col) = grid.get_start(self);
         } else {
           col += 1;
         }
@@ -573,7 +573,7 @@ impl Cursor {
 
         // Move one square down, or loop back to the start of the word.
         if row == grid.height() - 1 || grid.get((row + 1, col)).is_black() {
-          (row, _) = grid.get_start(&self);
+          (row, _) = grid.get_start(self);
         } else {
           row += 1;
         }

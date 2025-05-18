@@ -1,5 +1,5 @@
-/// Checksum logic. See
-/// https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5#checksums
+//! Checksum logic. See
+//! <https://gist.github.com/sliminality/dab21fa834eae0a70193c7cd69c356d5#checksums>
 
 #[must_use]
 pub(crate) fn checksum_region(base: &[u8], input_checksum: u16) -> u16 {
