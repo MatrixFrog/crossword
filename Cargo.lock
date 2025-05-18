@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "crosstui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossterm 0.29.0",
  "crossword",
@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "crossword"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "encoding",
 ]

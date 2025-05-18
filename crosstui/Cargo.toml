@@ -8,6 +8,6 @@ repository.workspace = true
 edition.workspace = true
 
 [dependencies]
-crossword = { path = "../crossword", version = "0.1.0" }
+crossword = { path = "../crossword", version = "0.2.0" }
 crossterm = "0.29.0"
 ratatui = "0.29.0"
