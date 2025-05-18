@@ -141,16 +141,17 @@ impl Puzzle {
     self.cursor.backup(&self.puz.solve_state);
   }
 
-  /// Moves the cursor forward one square, if possible. That is, one square to the right if
-  /// the current cursor direction is Across, and one square down, if the current direction
-  /// is down.
-  pub fn advance_cursor(&mut self) {
-    self.cursor.advance(&self.puz.solve_state);
+  /// Moves the cursor to the next empty square in the current word, or if there are no
+  /// empty squares left, to the start of the next word.
+  pub fn move_cursor_to_next_empty_in_current_word(&mut self) {
+    self
+      .cursor
+      .move_to_next_empty_in_current_word(&self.puz.solve_state);
   }
 
   /// Moves the cursor to the next word in the puzzle.
   pub fn advance_cursor_to_next_word(&mut self) {
-    self.puz.solve_state.next_start(&mut self.cursor);
+    self.cursor.advance_to_next_word(&self.puz.solve_state);
   }
 
   /// Attempts to swap the cursor direction. However, if the current square is
@@ -202,6 +203,10 @@ impl Square {
   /// Whether this is [Square::Black].
   fn is_black(&self) -> bool {
     *self == Self::Black
+  }
+
+  fn is_empty(&self) -> bool {
+    *self == Self::Empty
   }
 
   /// Whether this is not a black square, i.e. either a [Square::Empty] or [Square::Letter].
@@ -294,37 +299,6 @@ impl Grid {
 
   fn set(&mut self, (r, c): Pos, square: Square) {
     self.0[r][c] = square;
-  }
-
-  /// Moves the cursor to the next word after the current one that is in
-  /// the same direction as the cursor. If we are already on the last `Across`
-  /// word, moves to the start of the first `Down` word, and vice versa.
-  fn next_start(&self, cursor: &mut Cursor) {
-    let mut iter = GridPosIter {
-      pos: self.get_start(cursor),
-      size: self.size(),
-    };
-
-    // Skip the start of the current word.
-    iter.next();
-
-    for pos in iter {
-      if self.starts(pos, cursor.direction) {
-        cursor.pos = pos;
-        return;
-      }
-    }
-
-    // No more words found for the given direction; try the other one.
-    for pos in self.positions() {
-      if self.starts(pos, !cursor.direction) {
-        cursor.pos = pos;
-        cursor.direction = !cursor.direction;
-        return;
-      }
-    }
-
-    unreachable!();
   }
 
   /// Returns the position of the next white square above `pos`.
@@ -559,11 +533,90 @@ impl Cursor {
     }
   }
 
-  fn advance(&mut self, grid: &Grid) {
-    match self.direction {
-      Across => self.right(grid),
-      Down => self.down(grid),
+  /// Moves the cursor to the next empty square starting from the current one,
+  /// in the current word.
+  ///
+  /// If there are no empty squares at or after the current one, moves to the
+  /// first empty square in the current word.
+  ///
+  /// If there are no empty squares anywhere in the word, advances to start of the next word.
+  fn move_to_next_empty_in_current_word(&mut self, grid: &Grid) {
+    if grid.get(self.pos).is_empty() {
+      return;
     }
+
+    let (mut row, mut col) = self.pos;
+    match self.direction {
+      Across => loop {
+        if grid.get((row, col)).is_empty() {
+          self.pos = (row, col);
+          return;
+        }
+
+        // Move one square right, or loop back to the start of the word.
+        if col == grid.width() - 1 || grid.get((row, col + 1)).is_black() {
+          (_, col) = grid.get_start(&self);
+        } else {
+          col += 1;
+        }
+
+        if (row, col) == self.pos {
+          self.advance_to_next_word(grid);
+          return;
+        }
+      },
+      Down => loop {
+        if grid.get((row, col)).is_empty() {
+          self.pos = (row, col);
+          return;
+        }
+
+        // Move one square down, or loop back to the start of the word.
+        if row == grid.height() - 1 || grid.get((row + 1, col)).is_black() {
+          (row, _) = grid.get_start(&self);
+        } else {
+          row += 1;
+        }
+
+        if (row, col) == self.pos {
+          self.advance_to_next_word(grid);
+          return;
+        }
+      },
+    }
+  }
+
+  /// Moves the cursor to the start of the next word after the current one that is in
+  /// the same direction as the cursor. If we are already on the last `Across`
+  /// word, moves to the start of the first `Down` word, and vice versa.
+  fn advance_to_next_word(&mut self, grid: &Grid) {
+    let mut iter = GridPosIter {
+      pos: grid.get_start(self),
+      size: grid.size(),
+    };
+
+    // Skip the start of the current word.
+    iter.next();
+
+    for pos in iter {
+      if grid.starts(pos, self.direction) {
+        self.pos = pos;
+        return;
+      }
+    }
+
+    // No more words found for the given direction; try the other one.
+    for pos in grid.positions() {
+      if grid.starts(pos, !self.direction) {
+        *self = Cursor {
+          pos,
+          direction: !self.direction,
+        };
+        return;
+      }
+    }
+
+    unreachable!();
   }
 
   fn backup(&mut self, grid: &Grid) {
@@ -678,7 +731,7 @@ mod tests {
           direction: Across
         }
       );
-      grid.next_start(&mut cursor);
+      cursor.advance_to_next_word(&grid);
     }
 
     for pos in down_starts {
@@ -689,7 +742,7 @@ mod tests {
           direction: Down
         }
       );
-      grid.next_start(&mut cursor);
+      cursor.advance_to_next_word(&grid);
     }
   }
 }

@@ -133,7 +133,7 @@ impl App {
       KeyCode::Char(letter) => {
         if letter.is_ascii_alphabetic() {
           self.puzzle.add_letter(letter);
-          self.puzzle.advance_cursor();
+          self.puzzle.move_cursor_to_next_empty_in_current_word();
         }
       }
       _ => {}
