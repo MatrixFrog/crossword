@@ -8,7 +8,7 @@ use ratatui::{
   layout::{Constraint, Flex, Layout, Rect},
   style::{Color, Modifier, Style, Stylize},
   text::{Line, Text},
-  widgets::{Block, Padding, Paragraph, Widget, Wrap},
+  widgets::{Block, Clear, List, Padding, Paragraph, Widget, Wrap},
 };
 
 const SQUARE_WIDTH: u16 = 7;
@@ -64,6 +64,7 @@ fn to_ratatui_style(value: SquareStyle) -> Style {
 pub struct App {
   puzzle: Puzzle,
   running: bool,
+  menu_showing: bool,
 }
 
 impl App {
@@ -71,6 +72,7 @@ impl App {
     Self {
       puzzle,
       running: true,
+      menu_showing: false,
     }
   }
 
@@ -103,8 +105,22 @@ impl App {
 
   /// Handles the key events and updates the state of [`App`].
   fn on_key_event(&mut self, key: KeyEvent) {
+    if self.menu_showing {
+      match key.code {
+        KeyCode::Esc => {
+          self.menu_showing = false;
+        }
+        KeyCode::Char('q') | KeyCode::Char('Q') => {
+          self.quit();
+        }
+        _ => {}
+      }
+    }
+
     match key.code {
-      KeyCode::Esc => self.quit(),
+      KeyCode::Esc => {
+        self.menu_showing = true;
+      }
       KeyCode::Up => {
         self.puzzle.cursor_up();
       }
@@ -158,6 +174,14 @@ impl App {
           .render(square_area, buf);
       }
     };
+  }
+
+  fn render_menu(&self, area: Rect, buf: &mut Buffer) {
+    Clear.render(area, buf);
+
+    List::new(["ESC: resume", "Q: quit"])
+      .block(Block::bordered().title(" Menu "))
+      .render(area, buf);
   }
 }
 
@@ -265,6 +289,11 @@ impl Widget for &App {
     Paragraph::new(metadata)
       .wrap(Wrap::default())
       .render(metadata_area, buf);
+
+    if self.menu_showing {
+      let menu_area = center(area, Constraint::Length(30), Constraint::Length(25));
+      self.render_menu(menu_area, buf);
+    }
   }
 }
 
