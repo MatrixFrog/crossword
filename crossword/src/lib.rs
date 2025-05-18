@@ -11,6 +11,7 @@ use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::ops::Not;
+use std::rc::Rc;
 
 mod checksum;
 mod puz;
@@ -123,22 +124,23 @@ impl Puzzle {
   pub fn add_letter(&mut self, letter: char) {
     assert!(letter.is_ascii_alphabetic());
 
-    self
-      .puz
-      .solve_state
+    Rc::get_mut(&mut self.puz.solve_state)
+      .unwrap()
       .set(self.cursor.pos, Square::Letter(letter.to_ascii_uppercase()));
   }
 
   /// Sets the current square to [Empty](Square::Empty).
   pub fn erase_letter(&mut self) {
-    self.puz.solve_state.set(self.cursor.pos, Square::Empty);
+    Rc::get_mut(&mut self.puz.solve_state)
+      .unwrap()
+      .set(self.cursor.pos, Square::Empty);
   }
 
   /// Moves the cursor back one square, if possible. That is, one square to the left if
   /// the current cursor direction is Across, and one square up, if the current direction
   /// is down.
   pub fn backup_cursor(&mut self) {
-    self.cursor.backup(&self.puz.solve_state);
+    self.cursor.backup();
   }
 
   /// Moves the cursor to the next empty square in the current word, or if there are no
@@ -151,7 +153,7 @@ impl Puzzle {
 
   /// Moves the cursor to the next word in the puzzle.
   pub fn advance_cursor_to_next_word(&mut self) {
-    self.cursor.advance_to_next_word(&self.puz.solve_state);
+    self.cursor.advance_to_next_word();
   }
 
   /// Attempts to swap the cursor direction. However, if the current square is
@@ -159,20 +161,20 @@ impl Puzzle {
   /// and vice versa.
   pub fn swap_cursor_direction(&mut self) {
     self.cursor.direction = !self.cursor.direction;
-    self.cursor.adjust_direction(&self.puz.solve_state);
+    self.cursor.adjust_direction();
   }
 
   pub fn cursor_up(&mut self) {
-    self.cursor.up(&self.puz.solve_state);
+    self.cursor.up();
   }
   pub fn cursor_down(&mut self) {
-    self.cursor.down(&self.puz.solve_state);
+    self.cursor.down();
   }
   pub fn cursor_left(&mut self) {
-    self.cursor.left(&self.puz.solve_state);
+    self.cursor.left();
   }
   pub fn cursor_right(&mut self) {
-    self.cursor.right(&self.puz.solve_state);
+    self.cursor.right();
   }
 }
 
@@ -502,31 +504,38 @@ struct Cursor {
   pos: Pos,
   /// The current direction.
   direction: Direction,
+  /// The grid this cursor is for.
+  grid: Rc<Grid>,
 }
 
 impl Cursor {
-  fn from_grid(grid: &Grid) -> Self {
+  fn from_grid(grid: &Rc<Grid>) -> Self {
     let pos = grid.positions().find(|&p| grid.get(p).is_white()).unwrap();
 
     let mut cursor = Self {
       pos,
       direction: Across,
+      grid: Rc::clone(grid),
     };
 
-    cursor.adjust_direction(grid);
+    cursor.adjust_direction();
 
     cursor
   }
 
-  fn adjust_direction(&mut self, grid: &Grid) {
+  fn adjust_direction(&mut self) {
     match self.direction {
       Across => {
-        if grid.right_neighbor(self.pos).is_black() && grid.left_neighbor(self.pos).is_black() {
+        if self.grid.right_neighbor(self.pos).is_black()
+          && self.grid.left_neighbor(self.pos).is_black()
+        {
           self.direction = Down;
         }
       }
       Down => {
-        if grid.up_neighbor(self.pos).is_black() && grid.down_neighbor(self.pos).is_black() {
+        if self.grid.up_neighbor(self.pos).is_black()
+          && self.grid.down_neighbor(self.pos).is_black()
+        {
           self.direction = Across;
         }
       }
@@ -561,7 +570,7 @@ impl Cursor {
         }
 
         if (row, col) == self.pos {
-          self.advance_to_next_word(grid);
+          self.advance_to_next_word();
           return;
         }
       },
@@ -579,7 +588,7 @@ impl Cursor {
         }
 
         if (row, col) == self.pos {
-          self.advance_to_next_word(grid);
+          self.advance_to_next_word();
           return;
         }
       },
@@ -589,29 +598,27 @@ impl Cursor {
   /// Moves the cursor to the start of the next word after the current one that is in
   /// the same direction as the cursor. If we are already on the last `Across`
   /// word, moves to the start of the first `Down` word, and vice versa.
-  fn advance_to_next_word(&mut self, grid: &Grid) {
+  fn advance_to_next_word(&mut self) {
     let mut iter = GridPosIter {
-      pos: grid.get_start(self),
-      size: grid.size(),
+      pos: self.grid.get_start(self),
+      size: self.grid.size(),
     };
 
     // Skip the start of the current word.
     iter.next();
 
     for pos in iter {
-      if grid.starts(pos, self.direction) {
+      if self.grid.starts(pos, self.direction) {
         self.pos = pos;
         return;
       }
     }
 
     // No more words found for the given direction; try the other one.
-    for pos in grid.positions() {
-      if grid.starts(pos, !self.direction) {
-        *self = Cursor {
-          pos,
-          direction: !self.direction,
-        };
+    for pos in self.grid.positions() {
+      if self.grid.starts(pos, !self.direction) {
+        self.pos = pos;
+        self.direction = !self.direction;
         return;
       }
     }
@@ -619,38 +626,38 @@ impl Cursor {
     unreachable!();
   }
 
-  fn backup(&mut self, grid: &Grid) {
+  fn backup(&mut self) {
     match self.direction {
-      Across => self.left(grid),
-      Down => self.up(grid),
+      Across => self.left(),
+      Down => self.up(),
     }
   }
 
-  fn up(&mut self, grid: &Grid) {
-    if let Some(pos) = grid.next_up_neighbor(self.pos) {
+  fn up(&mut self) {
+    if let Some(pos) = self.grid.next_up_neighbor(self.pos) {
       self.pos = pos;
-      self.adjust_direction(grid);
+      self.adjust_direction();
     }
   }
 
-  fn down(&mut self, grid: &Grid) {
-    if let Some(pos) = grid.next_down_neighbor(self.pos) {
+  fn down(&mut self) {
+    if let Some(pos) = self.grid.next_down_neighbor(self.pos) {
       self.pos = pos;
-      self.adjust_direction(grid);
+      self.adjust_direction();
     }
   }
 
-  fn left(&mut self, grid: &Grid) {
-    if let Some(pos) = grid.next_left_neighbor(self.pos) {
+  fn left(&mut self) {
+    if let Some(pos) = self.grid.next_left_neighbor(self.pos) {
       self.pos = pos;
-      self.adjust_direction(grid);
+      self.adjust_direction();
     }
   }
 
-  fn right(&mut self, grid: &Grid) {
-    if let Some(pos) = grid.next_right_neighbor(self.pos) {
+  fn right(&mut self) {
+    if let Some(pos) = self.grid.next_right_neighbor(self.pos) {
       self.pos = pos;
-      self.adjust_direction(grid);
+      self.adjust_direction();
     }
   }
 }
@@ -702,7 +709,7 @@ mod tests {
 
   #[test]
   fn grid_starts() {
-    let grid = basic_grid();
+    let grid = Rc::new(basic_grid());
 
     let across_starts = [(0, 0), (1, 0), (2, 2), (3, 0)];
     let down_starts = [(0, 0), (0, 1), (0, 3), (2, 2)];
@@ -724,25 +731,15 @@ mod tests {
     let mut cursor = Cursor::from_grid(&grid);
 
     for pos in across_starts {
-      assert_eq!(
-        cursor,
-        Cursor {
-          pos,
-          direction: Across
-        }
-      );
-      cursor.advance_to_next_word(&grid);
+      assert_eq!(cursor.pos, pos);
+      assert_eq!(cursor.direction, Across);
+      cursor.advance_to_next_word();
     }
 
     for pos in down_starts {
-      assert_eq!(
-        cursor,
-        Cursor {
-          pos,
-          direction: Down
-        }
-      );
-      cursor.advance_to_next_word(&grid);
+      assert_eq!(cursor.pos, pos);
+      assert_eq!(cursor.direction, Down);
+      cursor.advance_to_next_word();
     }
   }
 }

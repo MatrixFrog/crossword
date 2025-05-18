@@ -3,6 +3,7 @@ use crate::{Direction, Error, Grid, Pos};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::rc::Rc;
 
 use encoding::DecoderTrap::Strict;
 use encoding::Encoding;
@@ -15,7 +16,7 @@ use crate::checksum::*;
 #[derive(Debug)]
 pub(crate) struct Puz {
   pub(crate) solution: Grid,
-  pub(crate) solve_state: Grid,
+  pub(crate) solve_state: Rc<Grid>,
   pub(crate) title: String,
   pub(crate) author: String,
   pub(crate) copyright: String,
@@ -165,7 +166,7 @@ impl Puz {
 
     let puz = Self {
       solution,
-      solve_state,
+      solve_state: Rc::new(solve_state),
       title: decode_str(&title)?,
       author: decode_str(&author)?,
       copyright: decode_str(&copyright)?,
