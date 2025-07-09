@@ -1,0 +1,37 @@
+# configuration for https://rust-lang.github.io/rustfmt/
+
+# These represent a reasonably opinionated set of defaults for Rust code formatting.
+# Mostly rustfmt's defaults are used, but the following options generally improve the readability
+# of the code and reduce the number of lines in a file.
+
+## Stable options
+## These options are available in the stable version of Rust
+
+# convert Foo { x: x } to Foo { x } to avoid repetition
+use_field_init_shorthand = true
+
+
+## unstable options
+## These options require the nightly version of Rust in order to apply
+
+# 80 character limit on comments tends to be too narrow for prose
+comment_width = 100
+
+# format code the same way as the rest of the code to avoid inconsistencies
+format_code_in_doc_comments = true
+
+# apply formatting to declarative macros
+format_macro_matchers = true
+
+# grouping imports makes the order of imports deterministic
+group_imports = "StdExternalCrate"
+
+# this has a tendency to reduce the number of lines in a file and improves readability due to less
+# nesting
+imports_granularity = "Module"
+
+# don't use #[doc] when /// will suffice
+normalize_doc_attributes = true
+
+# necessary to force comments to be wrapped
+wrap_comments = true

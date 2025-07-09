@@ -5,12 +5,12 @@
 //! Puzzles are loaded from `.puz` files, a de facto standard format for crossword puzzles.
 //! You can find `.puz` files to download on many crossword sites.
 
+use std::cmp::{max, min};
+use std::fmt::{Debug, Display};
+use std::ops::Not;
+
 use Direction::{Across, Down};
 use puz::Puz;
-use std::cmp::{max, min};
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::ops::Not;
 
 mod checksum;
 mod puz;

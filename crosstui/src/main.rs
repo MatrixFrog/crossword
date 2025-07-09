@@ -2,14 +2,12 @@ use std::{env, io};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use crossword::{Puzzle, Square, SquareStyle};
-use ratatui::{
-    DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::{Constraint, Flex, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize},
-    text::{Line, Text},
-    widgets::{Block, Padding, Paragraph, Widget, Wrap},
-};
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Flex, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::text::{Line, Text};
+use ratatui::widgets::{Block, Padding, Paragraph, Widget, Wrap};
+use ratatui::{DefaultTerminal, Frame};
 
 const SQUARE_WIDTH: u16 = 7;
 const SQUARE_HEIGHT: u16 = 3;

@@ -1,14 +1,13 @@
-use crate::Direction::{Across, Down};
-use crate::{Direction, Error, Grid, Pos};
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use encoding::DecoderTrap::Strict;
 use encoding::Encoding;
 use encoding::all::{ISO_8859_1, UTF_8};
 
+use crate::Direction::{Across, Down};
 use crate::checksum::*;
+use crate::{Direction, Error, Grid, Pos};
 
 /// A `Puz` is essentially only the data in a .puz file. For an interactively solvable
 /// puzzle, use `Puzzle` which includes a Cursor.
@@ -353,8 +352,10 @@ impl Display for Checksum {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::fs;
+
     use super::*;
-    use std::{collections::HashMap, fs};
 
     #[test]
     fn parse_v12_puzzle() {
