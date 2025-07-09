@@ -1,7 +1,6 @@
-use crossword::{ChecksumMismatch, Error, Puzzle};
+use std::{env, fs};
 
-use std::env;
-use std::fs;
+use crossword::{ChecksumMismatch, Error, Puzzle};
 
 fn parse_puzzle(path: &str) -> Result<(Puzzle, Vec<ChecksumMismatch>), Error> {
     let data: Vec<u8> = fs::read(path)?;
