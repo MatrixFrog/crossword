@@ -1,5 +1,9 @@
-use std::{env, io};
+use std::io;
+use std::path::{Path, PathBuf};
 
+use clap::Parser;
+use clap::builder::Styles;
+use clap::builder::styling::AnsiColor;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use crossword::{Puzzle, Square, SquareStyle};
 use ratatui::buffer::Buffer;
@@ -12,15 +16,23 @@ use ratatui::{DefaultTerminal, Frame};
 const SQUARE_WIDTH: u16 = 7;
 const SQUARE_HEIGHT: u16 = 3;
 
+const HELP_STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Blue.on_default().bold())
+    .usage(AnsiColor::Blue.on_default().bold())
+    .literal(AnsiColor::White.on_default())
+    .placeholder(AnsiColor::Green.on_default());
+
+#[derive(Parser, Debug)]
+#[command(version, about, author, styles = HELP_STYLES)]
+struct Cli {
+    /// The path to the .puz file
+    path: PathBuf,
+}
+
 fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
+    let args = Cli::parse();
 
-    if args.len() < 2 {
-        println!("Pass the filename of a .puz file to play");
-        std::process::exit(1);
-    }
-
-    let puzzle = parse_puzzle(&args[1]);
+    let puzzle = load_puzzle(&args.path);
     let app = App::new(puzzle);
 
     let terminal = ratatui::init();
@@ -29,7 +41,7 @@ fn main() -> io::Result<()> {
     result
 }
 
-pub fn parse_puzzle(path: &str) -> Puzzle {
+pub fn load_puzzle(path: &Path) -> Puzzle {
     let data: Vec<u8> = std::fs::read(path).unwrap_or_else(|err| {
         println!("{:?}", err);
         std::process::exit(1);
