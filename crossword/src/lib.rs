@@ -686,16 +686,16 @@ mod tests {
         let grid = Grid::parse(grid_bytes, 4, 4);
 
         #[rustfmt::skip]
-    assert_eq!(
-      grid.to_string(),
-      concat!(
-        "\n",
-        "  ■ \n",
-        "  ■ \n",
-        " ■  \n",
-        "    \n",
-      )
-    );
+        assert_eq!(
+          grid.to_string(),
+          concat!(
+            "\n",
+            "  ■ \n",
+            "  ■ \n",
+            " ■  \n",
+            "    \n",
+          )
+        );
 
         grid
     }
