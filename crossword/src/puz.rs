@@ -368,46 +368,46 @@ mod tests {
         assert_eq!(puz.notes, "");
 
         #[rustfmt::skip]
-    assert_eq!(puz.numbered_squares, HashMap::from([
-      ((0, 1), 1),
-      ((1, 0), 2),
-      ((1, 3), 3),
-      ((3, 1), 4),
-    ]));
+        assert_eq!(puz.numbered_squares, HashMap::from([
+          ((0, 1), 1),
+          ((1, 0), 2),
+          ((1, 3), 3),
+          ((3, 1), 4),
+        ]));
 
         #[rustfmt::skip]
-    assert_eq!(
-      puz.clues,
-      HashMap::from([
-        ((1, Down), "Pumps your basement".into()), // SUMP
-        ((2, Across), "I'm ___, thanks for asking\\!".into()), // SUPER
-        ((3, Down), "Until".into()), // ERE
-        ((4, Across), "One step short of a pier".into()), // PIE
-      ])
-    );
+        assert_eq!(
+          puz.clues,
+          HashMap::from([
+            ((1, Down), "Pumps your basement".into()), // SUMP
+            ((2, Across), "I'm ___, thanks for asking\\!".into()), // SUPER
+            ((3, Down), "Until".into()), // ERE
+            ((4, Across), "One step short of a pier".into()), // PIE
+          ])
+        );
 
         #[rustfmt::skip]
-    assert_eq!(
-      puz.solution.to_string(),
-      concat!(
-        "\n",
-        "■S■■■\n",
-        "SUPER\n",
-        "■M■R■\n",
-        "■PIE■\n",
-      )
-    );
+        assert_eq!(
+          puz.solution.to_string(),
+          concat!(
+            "\n",
+            "■S■■■\n",
+            "SUPER\n",
+            "■M■R■\n",
+            "■PIE■\n",
+          )
+        );
 
         #[rustfmt::skip]
-    assert_eq!(
-      puz.solve_state.to_string(),
-      concat!(
-        "\n",
-        "■S■■■\n",
-        " U   \n",
-        "■M■ ■\n",
-        "■P  ■\n",
-      )
-    );
+        assert_eq!(
+          puz.solve_state.to_string(),
+          concat!(
+            "\n",
+            "■S■■■\n",
+            " U   \n",
+            "■M■ ■\n",
+            "■P  ■\n",
+          )
+        );
     }
 }
