@@ -4,14 +4,15 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 use clap::builder::Styles;
 use clap::builder::styling::AnsiColor;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, KeyCode, KeyEvent};
 use crossword::{Puzzle, Square, SquareStyle};
+use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Flex, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::text::{Line, Text};
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Color, Style, Stylize};
+use ratatui::text::Line;
 use ratatui::widgets::{Block, Padding, Paragraph, Widget, Wrap};
-use ratatui::{DefaultTerminal, Frame};
+use ratatui_macros::{line, text};
 
 const SQUARE_WIDTH: u16 = 7;
 const SQUARE_HEIGHT: u16 = 3;
@@ -31,14 +32,9 @@ struct Cli {
 
 fn main() -> io::Result<()> {
     let args = Cli::parse();
-
     let puzzle = load_puzzle(&args.path);
     let app = App::new(puzzle);
-
-    let terminal = ratatui::init();
-    let result = app.run(terminal);
-    ratatui::restore();
-    result
+    ratatui::run(|terminal| app.run(terminal))
 }
 
 pub fn load_puzzle(path: &Path) -> Puzzle {
@@ -61,15 +57,6 @@ pub fn load_puzzle(path: &Path) -> Puzzle {
     puzzle
 }
 
-fn to_ratatui_style(value: SquareStyle) -> Style {
-    let base_style = match value {
-        SquareStyle::Standard => Style::new().bg(Color::White),
-        SquareStyle::Cursor => Style::new().bg(Color::LightRed),
-        SquareStyle::Word => Style::new().bg(Color::LightYellow),
-    };
-    base_style.fg(Color::Black).add_modifier(Modifier::BOLD)
-}
-
 #[derive(Debug)]
 pub struct App {
     puzzle: Puzzle,
@@ -84,29 +71,19 @@ impl App {
         }
     }
 
-    pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
+    pub fn run(mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         self.running = true;
         while self.running {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
             self.handle_crossterm_events()?;
         }
         Ok(())
     }
 
-    fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
     /// Reads the crossterm events and updates the state of [`App`].
-    ///
-    /// If your application needs to perform work in between handling events, you can use the
-    /// [`event::poll`] function to check if there are any events available with a timeout.
     fn handle_crossterm_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            // it's important to check KeyEventKind::Press to avoid handling key release events
-            Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key),
-            Event::Mouse(_) => {}
-            Event::Resize(_, _) => {}
-            _ => {}
+        if let Some(key) = event::read()?.as_key_press_event() {
+            self.on_key_event(key);
         }
         Ok(())
     }
@@ -115,31 +92,17 @@ impl App {
     fn on_key_event(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => self.quit(),
-            KeyCode::Up => {
-                self.puzzle.cursor_up();
-            }
-            KeyCode::Down => {
-                self.puzzle.cursor_down();
-            }
-            KeyCode::Left => {
-                self.puzzle.cursor_left();
-            }
-            KeyCode::Right => {
-                self.puzzle.cursor_right();
-            }
+            KeyCode::Up => self.puzzle.cursor_up(),
+            KeyCode::Down => self.puzzle.cursor_down(),
+            KeyCode::Left => self.puzzle.cursor_left(),
+            KeyCode::Right => self.puzzle.cursor_right(),
             KeyCode::Backspace => {
                 self.puzzle.erase_letter();
                 self.puzzle.backup_cursor();
             }
-            KeyCode::Delete => {
-                self.puzzle.erase_letter();
-            }
-            KeyCode::Tab => {
-                self.puzzle.advance_cursor_to_next_word();
-            }
-            KeyCode::Char(' ') => {
-                self.puzzle.swap_cursor_direction();
-            }
+            KeyCode::Delete => self.puzzle.erase_letter(),
+            KeyCode::Tab => self.puzzle.advance_cursor_to_next_word(),
+            KeyCode::Char(' ') => self.puzzle.swap_cursor_direction(),
             KeyCode::Char(letter) => {
                 if letter.is_ascii_alphabetic() {
                     self.puzzle.add_letter(letter);
@@ -154,89 +117,41 @@ impl App {
     fn quit(&mut self) {
         self.running = false;
     }
-
-    fn render_square(&self, square: Square, style: Style, square_area: Rect, buf: &mut Buffer) {
-        match square {
-            Square::Black => Block::new()
-                .style(Style::new().bg(Color::Black))
-                .render(square_area, buf),
-            Square::Empty => Block::new().style(style).render(square_area, buf),
-            Square::Letter(c) => {
-                Paragraph::new(c.to_string())
-                    .block(Block::new().style(style).padding(Padding::top(1)))
-                    .centered()
-                    .render(square_area, buf);
-            }
-        };
-    }
 }
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let [title_area, main_area] =
-            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(area);
+        let vertical = Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]);
+        let [title_area, main_area] = area.layout(&vertical);
 
-        let title = Text::from(vec![
-            Line::from(""),
-            Line::from(vec![
-                "Crosstui".light_blue(),
-                ": ".into(),
-                self.puzzle.title().into(),
-            ])
-            .bold()
-            .centered(),
-        ]);
+        let title = text![
+            "",
+            line!["Crosstui".light_blue(), ": ", self.puzzle.title()]
+                .bold()
+                .centered(),
+        ];
         title.render(title_area, buf);
 
-        let [puzzle_area, right_area] =
-            Layout::horizontal([Constraint::Percentage(100), Constraint::Length(45)])
-                .areas(main_area);
+        let horizontal = Layout::horizontal([Constraint::Percentage(100), Constraint::Length(45)]);
+        let [puzzle_area, right_area] = main_area.layout(&horizontal);
 
-        let puzzle_area = center(
-            puzzle_area,
-            Constraint::Length(
-                (self.puzzle.grid().width() * (2 + SQUARE_WIDTH as usize))
-                    .try_into()
-                    .unwrap(),
-            ),
-            Constraint::Length(
-                (self.puzzle.grid().height() * (1 + SQUARE_HEIGHT as usize))
-                    .try_into()
-                    .unwrap(),
-            ),
-        );
+        PuzzleGrid::new(&self.puzzle).render(puzzle_area, buf);
 
-        let mut square_area = Rect {
-            x: puzzle_area.x,
-            y: puzzle_area.y,
-            width: SQUARE_WIDTH,
-            height: SQUARE_HEIGHT,
-        };
-        for row in 0..self.puzzle.grid().height() {
-            for col in 0..self.puzzle.grid().width() {
-                let square = self.puzzle.grid().get((row, col));
-                let style = to_ratatui_style(self.puzzle.square_style((row, col)));
-                self.render_square(square, style, square_area, buf);
-                square_area.x += SQUARE_WIDTH + 2;
-            }
-            square_area.x = puzzle_area.x;
-            square_area.y += SQUARE_HEIGHT + 1;
-        }
-
-        let [instructions_area, clue_area, metadata_area] = Layout::vertical([
+        let layout = Layout::vertical([
             Constraint::Length(10),
-            Constraint::Percentage(100),
+            Constraint::Fill(1),
             Constraint::Length(15),
-        ])
-        .areas(right_area);
+        ]);
+        let [instructions_area, clue_area, metadata_area] = right_area.layout(&layout);
 
-        Paragraph::new(Line::from(vec![
+        let instructions = line![
             "Instructions: ".bold(),
             "Use the arrow keys, space, and tab, to navigate the puzzle. Press escape to exit."
                 .gray(),
-        ]))
-        .wrap(Wrap::default())
-        .render(instructions_area, buf);
+        ];
+        Paragraph::new(instructions)
+            .wrap(Wrap::default())
+            .render(instructions_area, buf);
 
         if self.puzzle.is_solved() {
             Paragraph::new("You solved it!")
@@ -280,11 +195,60 @@ impl Widget for &App {
     }
 }
 
-/// <https://ratatui.rs/recipes/layout/center-a-widget/>
-fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
-    let [area] = Layout::horizontal([horizontal])
-        .flex(Flex::Center)
-        .areas(area);
-    let [area] = Layout::vertical([vertical]).flex(Flex::Center).areas(area);
-    area
+// A widget that renders the puzzle grid.
+struct PuzzleGrid<'a> {
+    puzzle: &'a Puzzle,
+}
+
+impl<'a> PuzzleGrid<'a> {
+    /// Creates a new `PuzzleGrid` widget.
+    pub fn new(puzzle: &'a Puzzle) -> Self {
+        Self { puzzle }
+    }
+}
+
+impl Widget for PuzzleGrid<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let grid = self.puzzle.grid();
+        let grid_area = area.centered(
+            Constraint::Length(grid.width() as u16 * (2 + SQUARE_WIDTH)),
+            Constraint::Length(grid.height() as u16 * (1 + SQUARE_HEIGHT)),
+        );
+
+        for row in 0..grid.height() {
+            for col in 0..grid.width() {
+                let square = grid.get((row, col));
+                let style = to_ratatui_style(self.puzzle.square_style((row, col)));
+                let square_area = Rect {
+                    x: grid_area.x + col as u16 * (SQUARE_WIDTH + 2),
+                    y: grid_area.y + row as u16 * (SQUARE_HEIGHT + 1),
+                    width: SQUARE_WIDTH,
+                    height: SQUARE_HEIGHT,
+                };
+                render_square(square, style, square_area, buf);
+            }
+        }
+    }
+}
+
+fn to_ratatui_style(value: SquareStyle) -> Style {
+    let bg = match value {
+        SquareStyle::Standard => Color::White,
+        SquareStyle::Cursor => Color::LightRed,
+        SquareStyle::Word => Color::LightYellow,
+    };
+    Style::new().bg(bg).black().bold()
+}
+
+fn render_square(square: Square, style: Style, area: Rect, buf: &mut Buffer) {
+    match square {
+        Square::Black => Block::new().on_black().render(area, buf),
+        Square::Empty => Block::new().style(style).render(area, buf),
+        Square::Letter(c) => {
+            Paragraph::new(c.to_string())
+                .block(Block::new().style(style).padding(Padding::top(1)))
+                .centered()
+                .render(area, buf);
+        }
+    };
 }
