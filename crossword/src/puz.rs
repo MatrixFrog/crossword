@@ -6,8 +6,8 @@ use encoding::Encoding;
 use encoding::all::{ISO_8859_1, UTF_8};
 
 use crate::Direction::{Across, Down};
-use crate::checksum::*;
-use crate::{Direction, Error, Grid, Pos};
+use crate::{ClueIdentifier, checksum::*};
+use crate::{Error, Grid, Pos};
 
 /// A `Puz` is essentially only the data in a .puz file. For an interactively solvable
 /// puzzle, use `Puzzle` which includes a Cursor.
@@ -21,9 +21,8 @@ pub(crate) struct Puz {
     pub(crate) notes: String,
     /// Mapping from grid positions to numbers.
     pub(crate) numbered_squares: HashMap<Pos, u8>,
-    /// Mapping from clue identifiers to clues. For instance the clue for 12 Down
-    /// can be found by calling `clues.get((12, Down))`.
-    pub(crate) clues: HashMap<(u8, Direction), String>,
+    /// Mapping from clue identifiers to clues. See [`ClueIdentifier`].
+    pub(crate) clues: HashMap<ClueIdentifier, String>,
 }
 
 impl Puz {
@@ -195,7 +194,7 @@ fn decode_str(bytes: &[u8]) -> Result<String, Error> {
 fn allocate_clues(
     grid: &Grid,
     clue_list: &[String],
-) -> (HashMap<Pos, u8>, HashMap<(u8, Direction), String>) {
+) -> (HashMap<Pos, u8>, HashMap<ClueIdentifier, String>) {
     let mut clue_number: u8 = 1;
     let mut numbered_squares = HashMap::new();
     let mut clues = HashMap::with_capacity(clue_list.len());
