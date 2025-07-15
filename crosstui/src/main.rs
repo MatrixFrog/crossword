@@ -5,14 +5,14 @@ use clap::Parser;
 use clap::builder::Styles;
 use clap::builder::styling::AnsiColor;
 use crossterm::event::{self, KeyCode, KeyEvent};
-use crossword::{Puzzle, Square, SquareStyle};
+use crossword::{Direction, Puzzle, Square, SquareStyle};
 use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Padding, Paragraph, Widget, Wrap};
-use ratatui_macros::{line, text};
+use ratatui_macros::{line, span, text};
 
 const SQUARE_WIDTH: u16 = 7;
 const SQUARE_HEIGHT: u16 = 3;
@@ -140,9 +140,15 @@ impl Widget for &App {
         let layout = Layout::vertical([
             Constraint::Length(10),
             Constraint::Fill(1),
-            Constraint::Length(15),
+            Constraint::Fill(1),
+            Constraint::Length(10),
         ]);
-        let [instructions_area, clue_area, metadata_area] = right_area.layout(&layout);
+        let [
+            instructions_area,
+            across_clue_area,
+            down_clue_area,
+            metadata_area,
+        ] = right_area.layout(&layout);
 
         let instructions = line![
             "Instructions: ".bold(),
@@ -158,18 +164,12 @@ impl Widget for &App {
                 .block(
                     Block::bordered()
                         .title(Line::from(" Congratulations! ").centered())
-                        .padding(Padding::uniform(4)),
+                        .padding(Padding::uniform(2)),
                 )
-                .render(clue_area, buf)
+                .render(across_clue_area, buf)
         } else {
-            Paragraph::new(self.puzzle.current_clue())
-                .wrap(Wrap::default())
-                .block(
-                    Block::bordered()
-                        .title(Line::from(" Current clue ").centered())
-                        .padding(Padding::uniform(4)),
-                )
-                .render(clue_area, buf);
+            self.render_clues(Direction::Across, across_clue_area, buf);
+            self.render_clues(Direction::Down, down_clue_area, buf);
         }
 
         let mut metadata: Vec<Line> = vec!["".into()];
@@ -192,6 +192,33 @@ impl Widget for &App {
         Paragraph::new(metadata)
             .wrap(Wrap::default())
             .render(metadata_area, buf);
+    }
+}
+
+impl App {
+    fn render_clues(&self, direction: Direction, area: Rect, buf: &mut Buffer) {
+        let current_clue_identifier = self.puzzle.current_clue_identifier();
+        let lines = self
+            .puzzle
+            .clues(direction)
+            .into_iter()
+            .map(|(num, clue)| {
+                let clue = if current_clue_identifier == (num, self.puzzle.cursor_direction()) {
+                    clue.black().on_light_yellow()
+                } else {
+                    span!(clue)
+                };
+                line![num.to_string().light_red(), ". ", clue]
+            })
+            .collect::<Vec<_>>();
+        Paragraph::new(lines)
+            .wrap(Wrap::default())
+            .block(
+                Block::bordered()
+                    .title(line![" ", direction.to_string(), " clues "].centered())
+                    .padding(Padding::uniform(4)),
+            )
+            .render(area, buf);
     }
 }
 
