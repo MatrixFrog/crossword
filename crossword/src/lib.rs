@@ -34,6 +34,15 @@ impl Not for Direction {
     }
 }
 
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Across => write!(f, "Across"),
+            Down => write!(f, "Down"),
+        }
+    }
+}
+
 /// Represents a crossword puzzle and its cursor (position and direction).
 /// When implementing a crossword app, this will be the main structure you will use.
 #[derive(Debug)]
@@ -77,6 +86,23 @@ impl Puzzle {
         &self.puz.notes
     }
 
+    pub fn clues(&self, direction: Direction) -> Vec<(u8, String)> {
+        let mut clues: Vec<(u8, String)> = self
+            .puz
+            .clues
+            .iter()
+            .filter_map(|((num, dir), clue)| {
+                if *dir == direction {
+                    Some((*num, clue.to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        clues.sort_by_key(|(num, _)| *num);
+        clues
+    }
+
     /// Determines how a particular square should be styled.
     /// See [SquareStyle].
     pub fn square_style(&self, pos: Pos) -> SquareStyle {
@@ -110,12 +136,14 @@ impl Puzzle {
 
     /// Returns the text of the current clue.
     pub fn current_clue(&self) -> &str {
+        let key = self.current_clue_identifier();
+        self.puz.clues.get(&key).unwrap()
+    }
+
+    pub fn current_clue_identifier(&self) -> (u8, Direction) {
         let pos = self.puz.solve_state.get_start(&self.cursor);
         let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
-        self.puz
-            .clues
-            .get(&(clue_number, self.cursor.direction))
-            .unwrap()
+        (clue_number, self.cursor.direction)
     }
 
     /// Writes the given letter to the current square.
@@ -170,6 +198,9 @@ impl Puzzle {
     }
     pub fn cursor_right(&mut self) {
         self.cursor.right(&self.puz.solve_state);
+    }
+    pub fn cursor_direction(&self) -> Direction {
+        self.cursor.direction
     }
 }
 
