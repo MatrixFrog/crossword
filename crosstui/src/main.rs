@@ -203,7 +203,7 @@ impl App {
             .clues(direction)
             .into_iter()
             .map(|(num, clue)| {
-                let clue = if current_clue_identifier == (num, self.puzzle.cursor_direction()) {
+                let clue = if current_clue_identifier == (num, direction) {
                     clue.black().on_light_yellow()
                 } else {
                     span!(clue)
