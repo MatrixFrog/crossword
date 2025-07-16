@@ -138,7 +138,7 @@ impl Widget for &App {
         PuzzleGrid::new(&self.puzzle).render(puzzle_area, buf);
 
         let layout = Layout::vertical([
-            Constraint::Length(10),
+            Constraint::Length(5),
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Length(10),
@@ -216,7 +216,7 @@ impl App {
             .block(
                 Block::bordered()
                     .title(line![" ", direction.to_string(), " clues "].centered())
-                    .padding(Padding::uniform(4)),
+                    .padding(Padding::symmetric(3, 2)),
             )
             .render(area, buf);
     }
