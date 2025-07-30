@@ -137,16 +137,26 @@ impl Puzzle {
         SquareStyle::Standard
     }
 
-    /// Returns the text of the current clue.
-    pub fn current_clue(&self) -> &str {
-        let key = self.current_clue_identifier();
-        self.puz.clues.get(&key).unwrap()
-    }
-
+    /// The identifier of the clue for the currently selected word.
     pub fn current_clue_identifier(&self) -> ClueIdentifier {
         let pos = self.puz.solve_state.get_start(&self.cursor);
         let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
         (clue_number, self.cursor.direction)
+    }
+
+    /// The identifier of the clue for the word that *would* be selected if the user were to swap the cursor direction.
+    pub fn cross_clue_identifier(&self) -> Option<ClueIdentifier> {
+        let cursor = Cursor {
+            pos: self.cursor.pos,
+            direction: !self.cursor.direction,
+        };
+        if !cursor.is_valid(&self.puz.solve_state) {
+            return None;
+        }
+
+        let pos = self.puz.solve_state.get_start(&cursor);
+        let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
+        Some((clue_number, cursor.direction))
     }
 
     /// Writes the given letter to the current square.
@@ -549,21 +559,28 @@ impl Cursor {
         cursor
     }
 
-    fn adjust_direction(&mut self, grid: &Grid) {
+    fn is_valid(&self, grid: &Grid) -> bool {
         match self.direction {
             Across => {
                 if grid.right_neighbor(self.pos).is_black()
                     && grid.left_neighbor(self.pos).is_black()
                 {
-                    self.direction = Down;
+                    return false;
                 }
             }
             Down => {
                 if grid.up_neighbor(self.pos).is_black() && grid.down_neighbor(self.pos).is_black()
                 {
-                    self.direction = Across;
+                    return false;
                 }
             }
+        }
+        true
+    }
+
+    fn adjust_direction(&mut self, grid: &Grid) {
+        if !self.is_valid(grid) {
+            self.direction = !self.direction;
         }
     }
 

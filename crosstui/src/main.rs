@@ -246,6 +246,7 @@ impl<'a> ClueList<'a> {
 impl Widget for ClueList<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let current_clue_identifier = self.puzzle.current_clue_identifier();
+        let cross_clue_identifier = self.puzzle.cross_clue_identifier();
 
         let mut list_state = ListState::default();
         let lines = self
@@ -254,25 +255,33 @@ impl Widget for ClueList<'_> {
             .into_iter()
             .enumerate()
             .map(|(index, (num, clue))| {
-                if current_clue_identifier == (num, self.direction) {
+                if current_clue_identifier == (num, self.direction)
+                    || cross_clue_identifier.is_some_and(|cross_clue_identifier| {
+                        cross_clue_identifier == (num, self.direction)
+                    })
+                {
                     list_state.select(Some(index));
                 };
                 line![num.to_string().light_red(), ". ", clue]
             })
             .collect::<Vec<_>>();
 
-        let clue_list = List::new(lines)
-            .highlight_style(Style::default().black().bold().on_light_yellow())
-            .block(
-                Block::bordered()
-                    .title(line![" ", self.direction.to_string(), " clues "].centered())
-                    .padding(Padding {
-                        left: 2,
-                        right: 3,
-                        top: 2,
-                        bottom: 2,
-                    }),
-            );
+        let highlight_style = if self.direction == self.puzzle.cursor_direction() {
+            Style::default().black().bold().on_light_yellow()
+        } else {
+            Style::default().blue().bold().on_gray()
+        };
+
+        let clue_list = List::new(lines).highlight_style(highlight_style).block(
+            Block::bordered()
+                .title(line![" ", self.direction.to_string(), " clues "].centered())
+                .padding(Padding {
+                    left: 2,
+                    right: 3,
+                    top: 2,
+                    bottom: 2,
+                }),
+        );
 
         StatefulWidget::render(clue_list, area, buf, &mut list_state);
     }
