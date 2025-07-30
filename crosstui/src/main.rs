@@ -139,12 +139,14 @@ impl Widget for &App {
 
         let layout = Layout::vertical([
             Constraint::Length(5),
+            Constraint::Length(4),
             Constraint::Fill(1),
             Constraint::Fill(1),
-            Constraint::Length(10),
+            Constraint::Length(8),
         ]);
         let [
             instructions_area,
+            current_clue_area,
             across_clue_area,
             down_clue_area,
             metadata_area,
@@ -166,11 +168,20 @@ impl Widget for &App {
                         .title(Line::from(" Congratulations! ").centered())
                         .padding(Padding::uniform(2)),
                 )
-                .render(across_clue_area, buf)
+                .render(current_clue_area, buf)
         } else {
-            ClueList::new(&self.puzzle, Direction::Across).render(across_clue_area, buf);
-            ClueList::new(&self.puzzle, Direction::Down).render(down_clue_area, buf);
+            let (num, direction) = self.puzzle.current_clue_identifier();
+            Paragraph::new(line![
+                format!("{}{}", num, direction.to_char()).light_red(),
+                ". ",
+                self.puzzle.current_clue()
+            ])
+            .wrap(Wrap::default())
+            .render(current_clue_area, buf);
         }
+
+        ClueList::new(&self.puzzle, Direction::Across).render(across_clue_area, buf);
+        ClueList::new(&self.puzzle, Direction::Down).render(down_clue_area, buf);
 
         let mut metadata: Vec<Line> = vec!["".into()];
         let author = self.puzzle.author();
@@ -277,9 +288,9 @@ impl Widget for ClueList<'_> {
                 .title(line![" ", self.direction.to_string(), " clues "].centered())
                 .padding(Padding {
                     left: 2,
-                    right: 3,
-                    top: 2,
-                    bottom: 2,
+                    right: 2,
+                    top: 1,
+                    bottom: 1,
                 }),
         );
 

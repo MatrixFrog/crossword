@@ -43,6 +43,15 @@ impl Display for Direction {
     }
 }
 
+impl Direction {
+    pub fn to_char(&self) -> char {
+        match self {
+            Across => 'A',
+            Down => 'D',
+        }
+    }
+}
+
 // The identifier for a clue. For instance, the "12 Down" clue would be represented by the value `(12, Direction::Down)`.
 type ClueIdentifier = (u8, Direction);
 
@@ -135,6 +144,11 @@ impl Puzzle {
         }
 
         SquareStyle::Standard
+    }
+
+    /// The text of the clue for the currently selected word.
+    pub fn current_clue(&self) -> &str {
+        self.puz.clues.get(&self.current_clue_identifier()).unwrap()
     }
 
     /// The identifier of the clue for the currently selected word.
