@@ -5,13 +5,13 @@ use clap::Parser;
 use clap::builder::Styles;
 use clap::builder::styling::AnsiColor;
 use crossterm::event::{self, KeyCode, KeyEvent};
-use crossword::{Puzzle, Square, SquareStyle};
+use crossword::{Direction, Puzzle, Square, SquareStyle};
 use ratatui::DefaultTerminal;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Padding, Paragraph, Widget, Wrap};
+use ratatui::widgets::{Block, List, ListState, Padding, Paragraph, StatefulWidget, Widget, Wrap};
 use ratatui_macros::{line, text};
 
 const SQUARE_WIDTH: u16 = 7;
@@ -138,11 +138,19 @@ impl Widget for &App {
         PuzzleGrid::new(&self.puzzle).render(puzzle_area, buf);
 
         let layout = Layout::vertical([
-            Constraint::Length(10),
+            Constraint::Length(5),
+            Constraint::Length(4),
             Constraint::Fill(1),
-            Constraint::Length(15),
+            Constraint::Fill(1),
+            Constraint::Length(8),
         ]);
-        let [instructions_area, clue_area, metadata_area] = right_area.layout(&layout);
+        let [
+            instructions_area,
+            current_clue_area,
+            across_clue_area,
+            down_clue_area,
+            metadata_area,
+        ] = right_area.layout(&layout);
 
         let instructions = line![
             "Instructions: ".bold(),
@@ -158,19 +166,22 @@ impl Widget for &App {
                 .block(
                     Block::bordered()
                         .title(Line::from(" Congratulations! ").centered())
-                        .padding(Padding::uniform(4)),
+                        .padding(Padding::uniform(2)),
                 )
-                .render(clue_area, buf)
+                .render(current_clue_area, buf)
         } else {
-            Paragraph::new(self.puzzle.current_clue())
-                .wrap(Wrap::default())
-                .block(
-                    Block::bordered()
-                        .title(Line::from(" Current clue ").centered())
-                        .padding(Padding::uniform(4)),
-                )
-                .render(clue_area, buf);
+            let (num, direction) = self.puzzle.current_clue_identifier();
+            Paragraph::new(line![
+                format!("{}{}", num, direction.to_char()).light_red(),
+                ". ",
+                self.puzzle.current_clue()
+            ])
+            .wrap(Wrap::default())
+            .render(current_clue_area, buf);
         }
+
+        ClueList::new(&self.puzzle, Direction::Across).render(across_clue_area, buf);
+        ClueList::new(&self.puzzle, Direction::Down).render(down_clue_area, buf);
 
         let mut metadata: Vec<Line> = vec!["".into()];
         let author = self.puzzle.author();
@@ -228,6 +239,62 @@ impl Widget for PuzzleGrid<'_> {
                 render_square(square, style, square_area, buf);
             }
         }
+    }
+}
+
+/// A widget that renders a list of clues
+struct ClueList<'a> {
+    puzzle: &'a Puzzle,
+    direction: Direction,
+}
+
+impl<'a> ClueList<'a> {
+    pub fn new(puzzle: &'a Puzzle, direction: Direction) -> Self {
+        Self { puzzle, direction }
+    }
+}
+
+impl Widget for ClueList<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let current_clue_identifier = self.puzzle.current_clue_identifier();
+        let cross_clue_identifier = self.puzzle.cross_clue_identifier();
+
+        let mut list_state = ListState::default();
+        let lines = self
+            .puzzle
+            .clues(self.direction)
+            .into_iter()
+            .enumerate()
+            .map(|(index, (num, clue))| {
+                if current_clue_identifier == (num, self.direction)
+                    || cross_clue_identifier.is_some_and(|cross_clue_identifier| {
+                        cross_clue_identifier == (num, self.direction)
+                    })
+                {
+                    list_state.select(Some(index));
+                };
+                line![num.to_string().light_red(), ". ", clue]
+            })
+            .collect::<Vec<_>>();
+
+        let highlight_style = if self.direction == self.puzzle.cursor_direction() {
+            Style::default().black().bold().on_light_yellow()
+        } else {
+            Style::default().blue().bold().on_gray()
+        };
+
+        let clue_list = List::new(lines).highlight_style(highlight_style).block(
+            Block::bordered()
+                .title(line![" ", self.direction.to_string(), " clues "].centered())
+                .padding(Padding {
+                    left: 2,
+                    right: 2,
+                    top: 1,
+                    bottom: 1,
+                }),
+        );
+
+        StatefulWidget::render(clue_list, area, buf, &mut list_state);
     }
 }
 

@@ -34,6 +34,27 @@ impl Not for Direction {
     }
 }
 
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Across => write!(f, "Across"),
+            Down => write!(f, "Down"),
+        }
+    }
+}
+
+impl Direction {
+    pub fn to_char(&self) -> char {
+        match self {
+            Across => 'A',
+            Down => 'D',
+        }
+    }
+}
+
+// The identifier for a clue. For instance, the "12 Down" clue would be represented by the value `(12, Direction::Down)`.
+type ClueIdentifier = (u8, Direction);
+
 /// Represents a crossword puzzle and its cursor (position and direction).
 /// When implementing a crossword app, this will be the main structure you will use.
 #[derive(Debug)]
@@ -77,6 +98,24 @@ impl Puzzle {
         &self.puz.notes
     }
 
+    /// Returns a sorted list of all the clues for the given [Direction].
+    pub fn clues(&self, direction: Direction) -> Vec<(u8, String)> {
+        let mut clues: Vec<(u8, String)> = self
+            .puz
+            .clues
+            .iter()
+            .filter_map(|((num, dir), clue)| {
+                if *dir == direction {
+                    Some((*num, clue.to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        clues.sort_by_key(|(num, _)| *num);
+        clues
+    }
+
     /// Determines how a particular square should be styled.
     /// See [SquareStyle].
     pub fn square_style(&self, pos: Pos) -> SquareStyle {
@@ -108,14 +147,31 @@ impl Puzzle {
         SquareStyle::Standard
     }
 
-    /// Returns the text of the current clue.
+    /// The text of the clue for the currently selected word.
     pub fn current_clue(&self) -> &str {
+        self.puz.clues.get(&self.current_clue_identifier()).unwrap()
+    }
+
+    /// The identifier of the clue for the currently selected word.
+    pub fn current_clue_identifier(&self) -> ClueIdentifier {
         let pos = self.puz.solve_state.get_start(&self.cursor);
         let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
-        self.puz
-            .clues
-            .get(&(clue_number, self.cursor.direction))
-            .unwrap()
+        (clue_number, self.cursor.direction)
+    }
+
+    /// The identifier of the clue for the word that *would* be selected if the user were to swap the cursor direction.
+    pub fn cross_clue_identifier(&self) -> Option<ClueIdentifier> {
+        let cursor = Cursor {
+            pos: self.cursor.pos,
+            direction: !self.cursor.direction,
+        };
+        if !cursor.is_valid(&self.puz.solve_state) {
+            return None;
+        }
+
+        let pos = self.puz.solve_state.get_start(&cursor);
+        let clue_number = *self.puz.numbered_squares.get(&pos).unwrap();
+        Some((clue_number, cursor.direction))
     }
 
     /// Writes the given letter to the current square.
@@ -170,6 +226,9 @@ impl Puzzle {
     }
     pub fn cursor_right(&mut self) {
         self.cursor.right(&self.puz.solve_state);
+    }
+    pub fn cursor_direction(&self) -> Direction {
+        self.cursor.direction
     }
 }
 
@@ -515,21 +574,28 @@ impl Cursor {
         cursor
     }
 
-    fn adjust_direction(&mut self, grid: &Grid) {
+    fn is_valid(&self, grid: &Grid) -> bool {
         match self.direction {
             Across => {
                 if grid.right_neighbor(self.pos).is_black()
                     && grid.left_neighbor(self.pos).is_black()
                 {
-                    self.direction = Down;
+                    return false;
                 }
             }
             Down => {
                 if grid.up_neighbor(self.pos).is_black() && grid.down_neighbor(self.pos).is_black()
                 {
-                    self.direction = Across;
+                    return false;
                 }
             }
+        }
+        true
+    }
+
+    fn adjust_direction(&mut self, grid: &Grid) {
+        if !self.is_valid(grid) {
+            self.direction = !self.direction;
         }
     }
 
