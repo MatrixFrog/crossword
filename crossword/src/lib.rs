@@ -98,6 +98,7 @@ impl Puzzle {
         &self.puz.notes
     }
 
+    /// Returns a sorted list of all the clues for the given [Direction].
     pub fn clues(&self, direction: Direction) -> Vec<(u8, String)> {
         let mut clues: Vec<(u8, String)> = self
             .puz

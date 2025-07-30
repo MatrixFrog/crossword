@@ -21,7 +21,7 @@ pub(crate) struct Puz {
     pub(crate) notes: String,
     /// Mapping from grid positions to numbers.
     pub(crate) numbered_squares: HashMap<Pos, u8>,
-    /// Mapping from clue identifiers to clues. See [`ClueIdentifier`].
+    /// Mapping from [`ClueIdentifier``]s to clues.
     pub(crate) clues: HashMap<ClueIdentifier, String>,
 }
 
