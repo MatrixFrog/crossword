@@ -132,8 +132,8 @@ impl Widget for &App {
         ];
         title.render(title_area, buf);
 
-        let horizontal = Layout::horizontal([Constraint::Percentage(100), Constraint::Length(45)]);
-        let [puzzle_area, right_area] = main_area.layout(&horizontal);
+        let horizontal = Layout::horizontal([Constraint::Length(45), Constraint::Percentage(100)]);
+        let [left_area, puzzle_area] = main_area.layout(&horizontal);
 
         PuzzleGrid::new(&self.puzzle).render(puzzle_area, buf);
 
@@ -150,7 +150,7 @@ impl Widget for &App {
             across_clue_area,
             down_clue_area,
             metadata_area,
-        ] = right_area.layout(&layout);
+        ] = left_area.layout(&layout);
 
         let instructions = line![
             "Instructions: ".bold(),
